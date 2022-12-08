@@ -5,7 +5,7 @@ from enum import Enum
 from functools import partial
 import collections
 import re
-from itertools import islice
+from itertools import islice, product, pairwise
 import abc
 
 def star(f):
@@ -71,7 +71,57 @@ def collect(factory, iterable):
 def part1(fname: str):
     with open(fname) as f:
         sections = read_sections(f)
-    print(f'*** part 1 ***')
+    heights = list(map(list, sections[0]))
+    s = iter(sections[0])
+    s = map(list, s)
+    s = map(lambda row: list(map(int, row)), s)
+    height = list(s)
+    
+    nrow = len(height)
+    ncol = len(height[0])
+    
+    def walk_from(i, j, dir):
+        di, dj = dir
+        i, j = i + di, j + dj
+        while 0 <= i < nrow and 0 <= j < ncol:
+            yield (i, j)
+            i, j = i + di, j + dj
+    def visible(i: int, j: int) -> bool:
+        h  = height[i][j]
+        for dir in [ (0, 1), (0, -1), (1, 0), (-1, 0) ]:
+            s = walk_from(i, j, dir)
+            #s = observe(partial(print), s)
+            if all(h > height[wi][wj] for wi, wj in s):
+                #print(f'visible: {(i, j)} in {dir}')
+                return True
+        return False
+        
+    def scenic_score(i, j) -> int:
+        h  = height[i][j]
+        score = 1
+        for dir in [ (0, 1), (0, -1), (1, 0), (-1, 0) ]:
+            dirscore = 0
+            s = walk_from(i, j, dir)
+            for wi, wj in s:
+                dirscore += 1
+                if height[wi][wj] >= h:
+                    break
+            score *= dirscore
+        #print(f'score {i, j} -> {score}')  
+        return score
+            
+    s = product(range(0, nrow), range(0, ncol))
+    s = map(star(visible), s)
+    s = filter(lambda item: item, s)
+    total = len(list(s))
+        
+    print(f'*** part 1: result = {total} ***')
+    
+    s = product(range(0, nrow), range(0, ncol))
+    s = map(star(scenic_score), s)
+    max_score = max(s)
+    
+    print(f'*** part 2: max scenic score = {max_score}')
  
 def part2(fname: str):
     with open(fname) as f:
