@@ -7,6 +7,8 @@ import collections
 import re
 from itertools import islice, product, pairwise
 import abc
+from functools import reduce
+import operator
 
 def star(f):
     return lambda t: f(*t)
@@ -70,10 +72,9 @@ def collect(factory, iterable):
     
 def takeuntil(predicate, items):
     for item in items:
-        if predicate(item):
-            yield item
-            return
         yield item
+        if predicate(item):
+            break
 
 def part1(fname: str):
     with open(fname) as f:
@@ -96,22 +97,29 @@ def part1(fname: str):
             i, j = i + di, j + dj
     
     def visible(i: int, j: int) -> bool:
-        h  = height[i][j]
-        for dir in [ (0, 1), (0, -1), (1, 0), (-1, 0) ]:
-            s = walk_from(i, j, dir)
-            if all(h > height[wi][wj] for wi, wj in s):
-                return True
-        return False
+        treeheight  = height[i][j]
+        s = iter([ (0, 1), (0, -1), (1, 0), (-1, 0) ])
+        s = map(partial(walk_from, i, j), s)
+        s = map(list, s)
+        vis = any(
+            all(treeheight > height[wi][wj] for wi, wj in walk)
+            for walk in s
+        )
+        return vis
+        
+    def walk_score(treeheight, walk) -> int:
+        s = iter(walk)
+        s = map(star(lambda i, j: height[i][j]), s)
+        s = takeuntil(lambda h: treeheight <= h, s)
+        return len(list(s))
         
     def scenic_score(i, j) -> int:
-        h  = height[i][j]
-        score = 1
-        for dir in [ (0, 1), (0, -1), (1, 0), (-1, 0) ]:
-            s = walk_from(i, j, dir)
-            s = map(star(lambda i, j: height[i][j]), s)
-            s = takeuntil(lambda walkheight: h <= walkheight, s)
-            dirscore = len(list(s))
-            score *= dirscore
+        treeheight  = height[i][j]
+        s = iter([ (0, 1), (0, -1), (1, 0), (-1, 0) ])
+        s = map(partial(walk_from, i, j), s)
+        s = map(list, s)
+        s = map(partial(walk_score, treeheight), s)
+        score = reduce(operator.mul, s)
         return score
             
     s = product(range(0, nrow), range(0, ncol))
