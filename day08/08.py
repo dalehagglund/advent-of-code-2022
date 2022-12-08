@@ -67,11 +67,19 @@ def drain(iterable):
 
 def collect(factory, iterable):
     return factory(iterable)
+    
+def takeuntil(predicate, items):
+    for item in items:
+        if predicate(item):
+            yield item
+            return
+        yield item
 
 def part1(fname: str):
     with open(fname) as f:
         sections = read_sections(f)
     heights = list(map(list, sections[0]))
+    
     s = iter(sections[0])
     s = map(list, s)
     s = map(lambda row: list(map(int, row)), s)
@@ -86,13 +94,12 @@ def part1(fname: str):
         while 0 <= i < nrow and 0 <= j < ncol:
             yield (i, j)
             i, j = i + di, j + dj
+    
     def visible(i: int, j: int) -> bool:
         h  = height[i][j]
         for dir in [ (0, 1), (0, -1), (1, 0), (-1, 0) ]:
             s = walk_from(i, j, dir)
-            #s = observe(partial(print), s)
             if all(h > height[wi][wj] for wi, wj in s):
-                #print(f'visible: {(i, j)} in {dir}')
                 return True
         return False
         
@@ -100,14 +107,11 @@ def part1(fname: str):
         h  = height[i][j]
         score = 1
         for dir in [ (0, 1), (0, -1), (1, 0), (-1, 0) ]:
-            dirscore = 0
             s = walk_from(i, j, dir)
-            for wi, wj in s:
-                dirscore += 1
-                if height[wi][wj] >= h:
-                    break
+            s = map(star(lambda i, j: height[i][j]), s)
+            s = takeuntil(lambda walkheight: h <= walkheight, s)
+            dirscore = len(list(s))
             score *= dirscore
-        #print(f'score {i, j} -> {score}')  
         return score
             
     s = product(range(0, nrow), range(0, ncol))
