@@ -88,12 +88,12 @@ class Knot:
     x: int = 0
     y: int = 0
     
-    def move(self, dx: int, dy: int) -> 'Self':
+    def move(self, dx: int, dy: int) -> 'Knot':
         assert 0 <= abs(dx) <= 1
         assert 0 <= abs(dy) <= 1
         return Knot(self.x + dx, self.y + dy)
         
-    def follow(self, k: 'Self') -> 'Self':
+    def follow(self, k: 'Knot') -> 'Knot':
         x, y = self.x, self.y
         dx, dy = k.x - self.x, k.y - self.y
         dist = max(abs(dx), abs(dy))
@@ -106,11 +106,9 @@ class Knot:
         elif k.y == self.y:
             x += sign(dx)
         elif abs(dx) == 2:
-            #assert abs(dy) == 1, f'{dy = }'
             x += sign(dx)
             y += sign(dy)
         elif abs(dy) == 2:
-            #assert abs(dx) == 1, f'{dx = }'
             x += sign(dx)
             y += sign(dy)
         else:
@@ -132,61 +130,30 @@ def read_moves(lines) -> list[tuple[str, int]]:
 def part1(fname: str):
     with open(fname) as f:
         sections = read_sections(f)
-    print(f'*** part 1***')
+    print(f'*** part 1 ***')
+    moves = read_moves(sections[0])
+    chain = make_chain(2)
+    print(f'***    {solve(chain, moves) = }')
 
-    s = iter(sections[0])
-    s = map(str.split, s)
-    s = map(partial(convert_fields, (str, int)), s)
-    moves = list(s)
-    
-    head = (0, 0)
-    tail = (0, 0)
-    visited = { tail }
-    
-        
-    def move(dir):
-        nonlocal head, tail, visited
-        dx, dy = dir
-        assert 0 <= abs(dx) <= 1 and 0 <= abs(dy) <= 1
-        headx, heady = head
-        tailx, taily = tail        
-        headx, heady = headx + dx, heady + dy
-        
-        dist = max(abs(headx - tailx), abs(heady - taily))
-        assert 0 <= dist <= 2, f'too far! {dir = } {head = } {tail = }'
-
-        if dist == 0 or dist == 1:
-            pass
-        elif headx == tailx:
-            taily += dy
-        elif heady == taily:
-            tailx += dx
-        elif abs(headx - tailx) == 2:
-            assert abs(heady - taily) == 1
-            tailx += sign(headx - tailx)
-            taily += sign(heady - taily)
-        elif abs(heady - taily) == 2:
-            assert abs(headx - tailx) == 1
-            tailx += sign(headx - tailx)
-            taily += sign(heady - taily)
-                   
-        head = (headx, heady)
-        tail = (tailx, taily)
-        visited.add(tail)
-        
-    for dir, nsteps in moves:
-        #print(f'move {dir} steps {nsteps}')
-        for _ in range(nsteps):
-            #print(f'    {head = } {tail = } {directions[dir] = }')
-            move(directions[dir])
-    print(f'***    {len(visited) = }')
+def make_chain(n: int) -> list[Knot]:
+    return [Knot(0, 0) for _ in range(n)]
 
 def update_chain(chain: list[Knot], direction):
     dx, dy = direction
     chain[0] = chain[0].move(dx, dy)
-
     for i in range(1, len(chain)):
         chain[i] = chain[i].follow(chain[i-1])
+
+def solve(
+        chain: list[Knot],
+        moves: list[tuple[str, int]]
+) -> int:
+    visited = { chain[-1] }
+    for dir, nsteps in moves:
+        for _ in range(nsteps):
+            update_chain(chain, directions[dir])
+            visited.add(chain[-1])
+    return len(visited)
 
 def part2(fname: str):
     with open(fname) as f:
@@ -194,18 +161,8 @@ def part2(fname: str):
     print(f'*** part 2 ***')
     
     moves = read_moves(sections[0])
-    visited = set()
-    chain = [ Knot(0, 0) for _ in range(10) ]
-    visited.add(chain[-1])
-    
-    for dir, nsteps in moves:
-        print(f'move {dir} steps {nsteps}')
-        for _ in range(nsteps):
-            update_chain(chain, directions[dir])
-            visited.add(chain[-1])
-            #print(f'   {chain = }')
-            #print(f'   {visited = }')
-    print(f'***    {len(visited) = }')
+    chain = make_chain(10)
+    print(f'***    {solve(chain, moves) = }')
 
 
 if __name__ == '__main__':
