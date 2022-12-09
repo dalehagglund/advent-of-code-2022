@@ -94,46 +94,22 @@ class Knot:
         return Knot(self.x + dx, self.y + dy)
         
     def follow(self, k: 'Knot') -> 'Knot':
-        x, y = self.x, self.y
         dx, dy = k.x - self.x, k.y - self.y
         dist = max(abs(dx), abs(dy))
         assert 0 <= dist <= 2
-        
-        if dist == 0 or dist == 1:
-            pass
-        elif k.x == self.x:
-            y += sign(dy)
-        elif k.y == self.y:
-            x += sign(dx)
-        elif abs(dx) == 2:
-            x += sign(dx)
-            y += sign(dy)
-        elif abs(dy) == 2:
-            x += sign(dx)
-            y += sign(dy)
-        else:
-            assert False, "huh?"
-            
-        return Knot(x, y)
+
+        return self.move(sign(dx), sign(dy)) if dist == 2 else self
     
-def sign(n):
-    assert n != 0, "not sure what sign(0) should be!"
+def sign(n: int) -> int:
     if n < 0: return -1
     if n > 0: return 1
+    return 0
 
 def read_moves(lines) -> list[tuple[str, int]]:
     s = iter(lines)
     s = map(str.split, s)
     s = map(partial(convert_fields, (str, int)), s)
     return list(s)
-
-def part1(fname: str):
-    with open(fname) as f:
-        sections = read_sections(f)
-    print(f'*** part 1 ***')
-    moves = read_moves(sections[0])
-    chain = make_chain(2)
-    print(f'***    {solve(chain, moves) = }')
 
 def make_chain(n: int) -> list[Knot]:
     return [Knot(0, 0) for _ in range(n)]
@@ -155,15 +131,21 @@ def solve(
             visited.add(chain[-1])
     return len(visited)
 
+def part1(fname: str):
+    with open(fname) as f:
+        sections = read_sections(f)
+    print(f'*** part 1 ***')
+    moves = read_moves(sections[0])
+    chain = make_chain(2)
+    print(f'***    {solve(chain, moves) = }')
+
 def part2(fname: str):
     with open(fname) as f:
         sections = read_sections(f)
     print(f'*** part 2 ***')
-    
     moves = read_moves(sections[0])
     chain = make_chain(10)
     print(f'***    {solve(chain, moves) = }')
-
 
 if __name__ == '__main__':
     part1(sys.argv[1])
