@@ -81,6 +81,54 @@ LEFT  = (-1,  0)
 UP    = ( 0,  1)
 DOWN  = ( 0, -1)
 
+directions = dict(R=RIGHT, L=LEFT, D=DOWN, U=UP)
+
+@dataclass(frozen=True)
+class Knot:
+    x: int = 0
+    y: int = 0
+    
+    def move(self, dx: int, dy: int) -> 'Self':
+        assert 0 <= abs(dx) <= 1
+        assert 0 <= abs(dy) <= 1
+        return Knot(self.x + dx, self.y + dy)
+        
+    def follow(self, k: 'Self') -> 'Self':
+        x, y = self.x, self.y
+        dx, dy = k.x - self.x, k.y - self.y
+        dist = max(abs(dx), abs(dy))
+        assert 0 <= dist <= 2
+        
+        if dist == 0 or dist == 1:
+            pass
+        elif k.x == self.x:
+            y += sign(dy)
+        elif k.y == self.y:
+            x += sign(dx)
+        elif abs(dx) == 2:
+            #assert abs(dy) == 1, f'{dy = }'
+            x += sign(dx)
+            y += sign(dy)
+        elif abs(dy) == 2:
+            #assert abs(dx) == 1, f'{dx = }'
+            x += sign(dx)
+            y += sign(dy)
+        else:
+            assert False, "huh?"
+            
+        return Knot(x, y)
+    
+def sign(n):
+    assert n != 0, "not sure what sign(0) should be!"
+    if n < 0: return -1
+    if n > 0: return 1
+
+def read_moves(lines) -> list[tuple[str, int]]:
+    s = iter(lines)
+    s = map(str.split, s)
+    s = map(partial(convert_fields, (str, int)), s)
+    return list(s)
+
 def part1(fname: str):
     with open(fname) as f:
         sections = read_sections(f)
@@ -95,12 +143,6 @@ def part1(fname: str):
     tail = (0, 0)
     visited = { tail }
     
-    directions = dict(R=RIGHT, L=LEFT, D=DOWN, U=UP)
-    
-    def sign(n):
-        assert n != 0, "not sure what sign(0) should be!"
-        if n < 0: return -1
-        if n > 0: return 1
         
     def move(dir):
         nonlocal head, tail, visited
@@ -133,16 +175,38 @@ def part1(fname: str):
         visited.add(tail)
         
     for dir, nsteps in moves:
-        print(f'move {dir} steps {nsteps}')
+        #print(f'move {dir} steps {nsteps}')
         for _ in range(nsteps):
-            print(f'    {head = } {tail = } {directions[dir] = }')
+            #print(f'    {head = } {tail = } {directions[dir] = }')
             move(directions[dir])
     print(f'***    {len(visited) = }')
-        
+
+def update_chain(chain: list[Knot], direction):
+    dx, dy = direction
+    chain[0] = chain[0].move(dx, dy)
+
+    for i in range(1, len(chain)):
+        chain[i] = chain[i].follow(chain[i-1])
+
 def part2(fname: str):
     with open(fname) as f:
         sections = read_sections(f)
     print(f'*** part 2 ***')
+    
+    moves = read_moves(sections[0])
+    visited = set()
+    chain = [ Knot(0, 0) for _ in range(10) ]
+    visited.add(chain[-1])
+    
+    for dir, nsteps in moves:
+        print(f'move {dir} steps {nsteps}')
+        for _ in range(nsteps):
+            update_chain(chain, directions[dir])
+            visited.add(chain[-1])
+            #print(f'   {chain = }')
+            #print(f'   {visited = }')
+    print(f'***    {len(visited) = }')
+
 
 if __name__ == '__main__':
     part1(sys.argv[1])
