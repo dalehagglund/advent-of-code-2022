@@ -99,9 +99,7 @@ def emulate(instructions: list[tuple[str, int]]):
 def solve(instructions: list[tuple[str, int]]) -> int:
     s = emulate(instructions)
     s = zip(itertools.count(1), s)
-    #s = observe(partial(print, 'prefilter:'), s)
     s = filter(star(lambda cyc, _: (cyc - 20) % 40 == 0), s)
-    s = observe(partial(print, 'postfilter:'), s)
     s = map(star(lambda x, y: x * y), s)
     return sum(s)
     return 0
@@ -121,18 +119,12 @@ def solve2(instructions):
 
     s = emulate(instructions)
     s = zip(itertools.count(1), s)
-    s = map(
-            star(
-                lambda cyc, x: (row(cyc), col(cyc), x)
-            ),
-            s
-        )
-    #s = observe(partial(print, 'rc adjust'), s)
+    s = map(star(lambda cyc, x: (row(cyc), col(cyc), x)), s)
     s = observe(star(draw), s)
     s = drain(s)
     
     for line in display:
-        print("".join(line))
+        print("      ", "".join(line))
 
 def decode(line):
     fields = line.split()
@@ -153,7 +145,7 @@ def part1(fname: str):
     s = map(decode, s)
     instructions = collect(list, s)
     
-    print(f'***    result = {solve(instructions)}')
+    print(f'       result = {solve(instructions)}')
 
 def part2(fname: str):
     with open(fname) as f:
