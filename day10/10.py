@@ -5,6 +5,7 @@ from enum import Enum
 from functools import partial
 import collections
 import re
+import itertools
 from itertools import islice, product, pairwise
 import abc
 from functools import reduce
@@ -75,17 +76,63 @@ def takeuntil(predicate, items):
         yield item
         if predicate(item):
             break
+            
+@dataclass
+class Regs:
+    X:int = 1
+
+def emulate(instructions: list[tuple[str, int]]):
+    regs = Regs()
+    
+    for inst in instructions:
+        match inst:
+            case ("noop"):
+                yield regs.X
+            case ("addx", n):
+                yield regs.X
+                yield regs.X
+                regs.X += n
+            case _:
+                assert False, "huh?"
+    
+                
+def solve(instructions: list[tuple[str, int]]) -> int:
+    s = emulate(instructions)
+    s = zip(itertools.count(1), s)
+    #s = observe(partial(print, 'prefilter:'), s)
+    s = filter(star(lambda cyc, _: (cyc - 20) % 40 == 0), s)
+    s = observe(partial(print, 'postfilter:'), s)
+    s = map(star(lambda x, y: x * y), s)
+    return sum(s)
+    return 0
 
 def part1(fname: str):
     with open(fname) as f:
         sections = read_sections(f)
     print(f'*** part 1 ***')
+    
+    def decode(line):
+        fields = line.split()
+        match fields:
+            case ["noop"]:
+                return ("noop")
+            case ["addx", n]:
+                return ("addx", int(n))
+            case _:
+                assert False, "huh?"
+                
+    
+    s = iter(sections[0])
+    s = map(decode, s)
+    instructions = collect(list, s)
+    
+    print(f'***    result = {solve(instructions)}')
 
 def part2(fname: str):
     with open(fname) as f:
         sections = read_sections(f)
     print(f'*** part 2 ***')
-
+    #print(f'***    result = {solve()}')
 if __name__ == '__main__':
     part1(sys.argv[1])
     part2(sys.argv[1])
