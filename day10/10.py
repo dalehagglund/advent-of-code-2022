@@ -79,7 +79,7 @@ def takeuntil(predicate, items):
             
 @dataclass
 class Regs:
-    X:int = 1
+    X: int = 1
 
 def emulate(instructions: list[tuple[str, int]]):
     regs = Regs()
@@ -102,18 +102,16 @@ def solve(instructions: list[tuple[str, int]]) -> int:
     s = filter(star(lambda cyc, _: (cyc - 20) % 40 == 0), s)
     s = map(star(lambda x, y: x * y), s)
     return sum(s)
-    return 0
     
 def solve2(instructions):
     display = [
-        [ "." ] * 40
+        [ " " ] * 40
         for _ in range(6)
     ]
 
     def draw(row, col, x):
-        if col - 1 <= x  <= col + 1:
-            display[row][col] = '#'
-      
+        display[row][col] = '.#'[col-1 <= x <= col+1]
+
     def row(cycle): return (cycle - 1) // 40
     def col(cycle): return (cycle - 1) %  40
 
