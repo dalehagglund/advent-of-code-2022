@@ -105,23 +105,50 @@ def solve(instructions: list[tuple[str, int]]) -> int:
     s = map(star(lambda x, y: x * y), s)
     return sum(s)
     return 0
+    
+def solve2(instructions):
+    display = [
+        [ "." ] * 40
+        for _ in range(6)
+    ]
+
+    def draw(row, col, x):
+        if col - 1 <= x  <= col + 1:
+            display[row][col] = '#'
+      
+    def row(cycle): return (cycle - 1) // 40
+    def col(cycle): return (cycle - 1) %  40
+
+    s = emulate(instructions)
+    s = zip(itertools.count(1), s)
+    s = map(
+            star(
+                lambda cyc, x: (row(cyc), col(cyc), x)
+            ),
+            s
+        )
+    #s = observe(partial(print, 'rc adjust'), s)
+    s = observe(star(draw), s)
+    s = drain(s)
+    
+    for line in display:
+        print("".join(line))
+
+def decode(line):
+    fields = line.split()
+    match fields:
+        case ["noop"]:
+            return ("noop")
+        case ["addx", n]:
+            return ("addx", int(n))
+        case _:
+            assert False, "huh?"
 
 def part1(fname: str):
     with open(fname) as f:
         sections = read_sections(f)
     print(f'*** part 1 ***')
-    
-    def decode(line):
-        fields = line.split()
-        match fields:
-            case ["noop"]:
-                return ("noop")
-            case ["addx", n]:
-                return ("addx", int(n))
-            case _:
-                assert False, "huh?"
-                
-    
+        
     s = iter(sections[0])
     s = map(decode, s)
     instructions = collect(list, s)
@@ -132,7 +159,12 @@ def part2(fname: str):
     with open(fname) as f:
         sections = read_sections(f)
     print(f'*** part 2 ***')
-    #print(f'***    result = {solve()}')
+    s = iter(sections[0])
+    s = map(decode, s)
+    instructions = collect(list, s)
+    
+    solve2(instructions)
+
 if __name__ == '__main__':
     part1(sys.argv[1])
     part2(sys.argv[1])
