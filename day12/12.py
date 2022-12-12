@@ -102,9 +102,14 @@ class Map:
             ni, nj = i + di, j + dj
             if not(0 <= ni < self._nrows): continue
             if not(0 <= nj < self._ncols): continue
-            if self.height(ni, nj) - self.height(i, j) > 1: continue
             yield (ni, nj)
             
+    def make_distance_grid(self):
+        return [
+            [ -1 for _ in range(self._ncols) ]
+            for _ in range(self._nrows)
+        ]
+        
     def print(self):
         def letter(i, j):
             if (i, j) == self._start: return "S"
@@ -142,12 +147,12 @@ class Map:
         assert start is not None and end is not None
         return Map(heights, start, end)
         
-def search(map) -> int:
-    goal = map.end()
-    start = map.start()
-    
+def search(map, start, goal, distances, forward=True) -> int:
     visited = set()
     queue = collections.deque()
+    
+    def allowed_move(src, dest):
+        return map.height(*dest) <= map.height(*src) + 1
     
     queue.append((0, start))
     while queue:
@@ -159,13 +164,23 @@ def search(map) -> int:
         if current in visited:
             # print(f'   current already visited')
             continue
+        i, j = current
+        distances[i][j] = steps
         if current == goal:
             return steps
         visited.add(current)
-        
+        curheight = map.height(*current)
+
         for neighbour in map.neighbours(*current):
             # print(f'   {neighbour = }')
             if neighbour in visited: continue
+            nheight = map.height(*neighbour)
+            
+            if forward:
+                if not allowed_move(current, neighbour): continue
+            else:
+                if not allowed_move(neighbour, current): continue
+
             # print(f'      append to {(steps+1, neighbour)}')
             queue.append((steps + 1, neighbour))
 
@@ -175,14 +190,50 @@ def part1(fname: str):
     print(f'*** part 1 ***')
     
     map = Map.parse(sections[0])
-    minsteps = search(map)
+    distances = map.make_distance_grid()
 
-    print(f'    {minsteps = }')
+    # minsteps = search(map, map.start(), map.end(), distances)
+    search(map, map.start(), None, distances)
+    
+    # print(
+        # "\n".join(
+            # " ".join(f'{dist:3d}' for dist in row)
+            # for row in distances
+        # )
+    # )
+
+    print(f'    {distances[map.end()[0]][map.end()[1]] = }')
     
 def part2(fname: str):
     with open(fname) as f:
         sections = read_sections(f)
     print(f'*** part 2 ***')
+    
+    map = Map.parse(sections[0])
+    distances = map.make_distance_grid()
+
+    # minsteps = search(map, map.start(), map.end(), distances)
+    search(map, map.end(), None, distances, forward=False)
+    
+    # print(
+        # "\n".join(
+            # " ".join(f'{dist:3d}' for dist in row)
+            # for row in distances
+        # )
+    # )
+    
+    starting_points = [
+        (i, j)
+        for i, j 
+        in product(range(map._nrows), range(map._ncols))
+        if map.height(i, j) == 0 and distances[i][j] >= 0
+    ]
+    
+    best_point = min(starting_points, key=star(lambda i, j: distances[i][j]))
+    # print(f'{starting_points = }')
+    # print(f'{best_point = }')
+
+    print(f'    {distances[best_point[0]][best_point[1]] = }')
 
 if __name__ == '__main__':
     part1(sys.argv[1])
