@@ -147,7 +147,7 @@ class Map:
         assert start is not None and end is not None
         return Map(heights, start, end)
         
-def search(map, start, goal, distances, forward=True) -> int:
+def search(map, start, goal, distances, forward=True) -> ty.Optional[int]:
     visited = set()
     queue = collections.deque()
     
@@ -169,13 +169,10 @@ def search(map, start, goal, distances, forward=True) -> int:
         if current == goal:
             return steps
         visited.add(current)
-        curheight = map.height(*current)
 
         for neighbour in map.neighbours(*current):
             # print(f'   {neighbour = }')
             if neighbour in visited: continue
-            nheight = map.height(*neighbour)
-            
             if forward:
                 if not allowed_move(current, neighbour): continue
             else:
@@ -192,15 +189,7 @@ def part1(fname: str):
     map = Map.parse(sections[0])
     distances = map.make_distance_grid()
 
-    # minsteps = search(map, map.start(), map.end(), distances)
     search(map, map.start(), None, distances)
-    
-    # print(
-        # "\n".join(
-            # " ".join(f'{dist:3d}' for dist in row)
-            # for row in distances
-        # )
-    # )
 
     print(f'    {distances[map.end()[0]][map.end()[1]] = }')
     
@@ -212,26 +201,15 @@ def part2(fname: str):
     map = Map.parse(sections[0])
     distances = map.make_distance_grid()
 
-    # minsteps = search(map, map.start(), map.end(), distances)
     search(map, map.end(), None, distances, forward=False)
-    
-    # print(
-        # "\n".join(
-            # " ".join(f'{dist:3d}' for dist in row)
-            # for row in distances
-        # )
-    # )
-    
+        
     starting_points = [
         (i, j)
         for i, j 
         in product(range(map._nrows), range(map._ncols))
         if map.height(i, j) == 0 and distances[i][j] >= 0
     ]
-    
     best_point = min(starting_points, key=star(lambda i, j: distances[i][j]))
-    # print(f'{starting_points = }')
-    # print(f'{best_point = }')
 
     print(f'    {distances[best_point[0]][best_point[1]] = }')
 
