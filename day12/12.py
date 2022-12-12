@@ -11,6 +11,7 @@ from itertools import islice, product, pairwise
 import abc
 from functools import reduce
 import operator
+import collections
 
 def star(f):
     return lambda t: f(*t)
@@ -83,12 +84,101 @@ def convert_ints(items: list[str]) -> list:
         int(item) if re.match("^[0-9]*$", item) else item
         for item in items
     ]
+    
+class Map:
+    def __init__(self, grid, start, end):
+        self._heights = grid
+        self._nrows = len(grid)
+        self._ncols = len(grid[0])
+        self._start = start
+        self._end = end
+        
+    def start(self):        return self._start
+    def end(self):          return self._end
+    def height(self, i, j): return self._heights[i][j]
+        
+    def neighbours(self, i:  int, j: int):
+        for di, dj in [ (-1, 0), (+1, 0), (0, -1), (0, +1) ]:
+            ni, nj = i + di, j + dj
+            if not(0 <= ni < self._nrows): continue
+            if not(0 <= nj < self._ncols): continue
+            if self.height(ni, nj) - self.height(i, j) > 1: continue
+            yield (ni, nj)
+            
+    def print(self):
+        def letter(i, j):
+            if (i, j) == self._start: return "S"
+            if (i, j) == self._end: return "E"
+            return "abcdefghijklmnopqrstuvwxyz"[self.height(i, j)]
+        output = [
+            [ letter(i, j) for j in range(self._ncols) ]
+            for i in range(self._nrows)
+        ]
+        print(
+            "\n".join(
+                " ".join(output_line)
+                for output_line in output
+            )
+        )                
+        
+    @classmethod
+    def parse(cls, lines: list[str]) -> 'Map':
+        heights = [
+            [ -1 for _ in range(len(lines[0])) ]
+            for _ in range(len(lines))
+        ]
+        start = end = None
+        for i, line in enumerate(lines):
+            for j, letter in enumerate(line):
+                if letter == "S":
+                    ht = 0
+                    start = (i, j)
+                elif letter == "E":
+                    ht = 25
+                    end = (i, j)
+                else:
+                    ht = ord(letter) - ord("a")
+                heights[i][j] = ht
+        assert start is not None and end is not None
+        return Map(heights, start, end)
+        
+def search(map) -> int:
+    goal = map.end()
+    start = map.start()
+    
+    visited = set()
+    queue = collections.deque()
+    
+    queue.append((0, start))
+    while queue:
+        # print(f'{queue = }')
+        steps, current = queue.popleft()
+        # print(f'   {steps = }')
+        # print(f'   {current = }')
+        # print(f'   {visited = }')
+        if current in visited:
+            # print(f'   current already visited')
+            continue
+        if current == goal:
+            return steps
+        visited.add(current)
+        
+        for neighbour in map.neighbours(*current):
+            # print(f'   {neighbour = }')
+            if neighbour in visited: continue
+            # print(f'      append to {(steps+1, neighbour)}')
+            queue.append((steps + 1, neighbour))
 
 def part1(fname: str):
     with open(fname) as f:
         sections = read_sections(f)
     print(f'*** part 1 ***')
+    
+    map = Map.parse(sections[0])
+    minsteps = search(map)
 
+    print(f'    {minsteps = }')
+    
 def part2(fname: str):
     with open(fname) as f:
         sections = read_sections(f)
