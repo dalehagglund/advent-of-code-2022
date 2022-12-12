@@ -149,12 +149,26 @@ def parse_monkey(monkeys: list[Monkey], lines: list[str]):
             
 def read_monkeys(
         sections: list[list[str]],
-        adjust
+        part2=False
 ) -> list[Monkey]:
-    monkeys = [ Monkey(adjust=adjust) for _ in range(len(sections)) ]
+    monkeys = [ Monkey() for _ in range(len(sections)) ]
     for i, section in enumerate(sections):
         parse_monkey(monkeys, section)
+    if not part2:
+        adjust = lambda n: n // 3
+    else:
+        modulus = functools.reduce(
+            operator.mul,
+            (m.divisor for m in monkeys)
+        )
+        adjust = lambda n: n % modulus
+    for m in monkeys:
+        m.adjust = adjust
     return monkeys
+    
+def run(monkeys, count):
+    for i in range(count):
+        update_round(i + 1, monkeys)
 
 def update_round(n: int, monkeys: list[Monkey], debug=False):
     for m in monkeys:
@@ -166,44 +180,27 @@ def update_round(n: int, monkeys: list[Monkey], debug=False):
         print(f'    monkey {m.id}: {m.items}')
     print(f'   inspections {m.id}: {[m.inspections for m in monkeys]}')
 
+def monkey_business(monkeys) -> int:
+    m1, m2 = sorted(m.inspections for m in monkeys)[-2:]
+    return m1 * m2
+    
 def part1(fname: str):
     with open(fname) as f:
         sections = read_sections(f)
     print(f'*** part 1 ***')
 
-    monkeys = read_monkeys(sections, lambda n: n // 3)
-    for i in range(20):
-        update_round(i + 1, monkeys)
- 
-    counts = [m.inspections for m in monkeys]
-    m1, m2 = sorted(counts)[-2:]
-    monkey_business = m1 * m2
-    print(f'    {monkey_business = }')
+    monkeys = read_monkeys(sections)
+    run(monkeys, 20)
+    print(f'    {monkey_business(monkeys) = }')
 
 def part2(fname: str):
-    import math
     with open(fname) as f:
         sections = read_sections(f)
     print(f'*** part 2 ***')
 
-    def make_adjust(div): return lambda n: n // div
-
-    modulus = 0
-    monkeys = read_monkeys(
-        sections, 
-        lambda n: int(n % modulus)
-    )
-    modulus = functools.reduce(operator.mul, (m.divisor for m in monkeys))
-    # print(f'    {modulus = }')
-    
-    matches = set()
-    for i in range(1, 10001):
-        update_round(i, monkeys, debug=False)
-        
-    counts = [m.inspections for m in monkeys]
-    m1, m2 = sorted(counts)[-2:]
-    monkey_business = m1 * m2
-    print(f'    {monkey_business = }')
+    monkeys = read_monkeys(sections, part2=True)
+    run(monkeys, 10000)
+    print(f'    {monkey_business(monkeys) = }')
 
 if __name__ == '__main__':
     part1(sys.argv[1])
