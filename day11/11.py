@@ -90,19 +90,13 @@ class Monkey:
     inspections: int = 0
     
     def process_items(self):
-        #print('Monkey', self.id)
         items, self.items = self.items, []
         for worry in items:
             self.inspections += 1
-            #print('   worry', worry) 
             worry = self.update(worry)
             worry = self.adjust(worry)
-           
-            #print('      updated', worry)
             outcome = self.test(worry)
-            #print('      outcome', outcome)
             target = self.throw_to[outcome]
-            #print('      throw to', target.id)
             self.throw_to[outcome].receive(worry)
         
     def receive(self, worry):
@@ -160,8 +154,6 @@ def read_monkeys(
     monkeys = [ Monkey(adjust=adjust) for _ in range(len(sections)) ]
     for i, section in enumerate(sections):
         parse_monkey(monkeys, section)
-    for m in monkeys:
-        print(f'monkey {m.id}: {m.divisor}')
     return monkeys
 
 def update_round(n: int, monkeys: list[Monkey], debug=False):
@@ -174,20 +166,14 @@ def update_round(n: int, monkeys: list[Monkey], debug=False):
         print(f'    monkey {m.id}: {m.items}')
     print(f'   inspections {m.id}: {[m.inspections for m in monkeys]}')
 
-def run(sections, updates, divisor):
-    monkeys = read_monkeys(sections, lambda n: n // divisor)
-    for i in range(updates):
-        update_round(i + 1, monkeys)
-    return monkeys
-
 def part1(fname: str):
     with open(fname) as f:
         sections = read_sections(f)
     print(f'*** part 1 ***')
 
-    monkeys = run(sections, 20, 3)
-    # for i in range(20):
-        # update_round(i + 1, monkeys)
+    monkeys = read_monkeys(sections, lambda n: n // 3)
+    for i in range(20):
+        update_round(i + 1, monkeys)
  
     counts = [m.inspections for m in monkeys]
     m1, m2 = sorted(counts)[-2:]
@@ -202,35 +188,19 @@ def part2(fname: str):
 
     def make_adjust(div): return lambda n: n // div
 
-    expected = {
-        1: [2, 4, 3, 6 ],
-        20: [99, 97, 8, 103 ],
-        1000: [ 5204, 4792, 199, 5192 ],
-    }       
     modulus = 0
     monkeys = read_monkeys(
         sections, 
         lambda n: int(n % modulus)
     )
     modulus = functools.reduce(operator.mul, (m.divisor for m in monkeys))
-    print(f'    {modulus = }')
+    # print(f'    {modulus = }')
     
     matches = set()
     for i in range(1, 10001):
         update_round(i, monkeys, debug=False)
         
-        #if i not in expected.keys(): continue
-        
-        #observed = [m.inspections for m in monkeys]
-        # print(f'{divisor = } {observed = }')
-        #if observed != expected[i]: break
-        #matches.add(i)
-    if len(matches) > 1:
-        print(f'{matches = }')
-            
-        
     counts = [m.inspections for m in monkeys]
-    print(counts)
     m1, m2 = sorted(counts)[-2:]
     monkey_business = m1 * m2
     print(f'    {monkey_business = }')
