@@ -90,6 +90,8 @@ def convert_ints(items: list[str]) -> list:
         for item in items
     ]
     
+def nth(n, items): return items[n]
+    
 def in_order(left, right, prefix="") -> int:
     def isint(item): return isinstance(item, int)
     def islist(item): return isinstance(item, list)
@@ -125,8 +127,6 @@ def part1(fname: str):
         s = iter(section)
         s = map(eval, s)
         left, right = collect(list, s)
-        #print(f'{left = } {right = }')
-        #print(f'{in_order(left, right) = }')
        
         if in_order(left, right) == -1:
             answer += i
@@ -141,25 +141,19 @@ def part2(fname: str):
         s = map(eval, s)
         packets = collect(list, s)
     print(f'*** part 2 ***')
-    
-    div2 = [[2]]
-    div6 = [[6]]
 
-    packets.extend([div2, div6])
+    dividers = [ [[2]], [[6]] ]
+    packets.extend(dividers)
     
     s = iter(packets)
     s = collect(partial(sorted, key=cmp_to_key(in_order)), s)
     s = zip(itertools.count(1), s)
-    s = filter(star(lambda _, pkt: pkt == div2 or pkt == div6), s)
-    s = map(star(lambda index, _: index), s)
-    result = reduce(
-        operator.mul,
-        s
-    )
+    s = filter(star(lambda _, pkt: pkt in dividers), s)
+    s = map(partial(nth, 0), s)
+    result = reduce(operator.mul, s)
     
     print(f'    {result = }')
-    
-    
+
 if __name__ == '__main__':
     part1(sys.argv[1])
     part2(sys.argv[1])
