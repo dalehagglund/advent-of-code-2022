@@ -91,7 +91,8 @@ def convert_ints(items: list[str]) -> list:
     ]
     
 def nth(n, items): return items[n]
-    
+def prod(items): reduce(operator.mul, items, 1)
+
 def in_order(left, right, prefix="") -> int:
     def isint(item): return isinstance(item, int)
     def islist(item): return isinstance(item, list)
