@@ -7,7 +7,12 @@ from functools import partial
 import collections
 import re
 import itertools
-from itertools import islice, product, pairwise
+from itertools import (
+    islice,
+    product,
+    pairwise,
+    zip_longest
+)
 import abc
 from functools import reduce
 import operator
@@ -84,11 +89,49 @@ def convert_ints(items: list[str]) -> list:
         int(item) if re.match("^[0-9]*$", item) else item
         for item in items
     ]
+    
+def in_order(left, right, prefix="") -> int:
+    def isint(item): return isinstance(item, int)
+    def islist(item): return isinstance(item, list)
+    
+    #print(f'{prefix}compare {left} vs {right}')
+    
+    if isint(left) and isint(right):
+        if left <  right: return -1
+        if left == right: return 0
+        if left >  right: return +1
+    elif islist(left) and islist(right):
+        for l, r in zip_longest(left, right):
+            if l is None and r is not None: return -1
+            if l is not None and r is None: return +1
+            outcome = in_order(l, r, prefix + "  ")
+            if outcome != 0:
+                return outcome
+        return 0
+    elif isint(left) and not isint(right):
+        return in_order([left], right, prefix + "  ")
+    elif not isint(left) and isint(right):
+        return in_order(left, [right], prefix + "  ")
+    else:
+        assert False, f'huh? {left = } {right = }'
 
 def part1(fname: str):
     with open(fname) as f:
         sections = read_sections(f)
     print(f'*** part 1 ***')
+    
+    answer = 0
+    for i, section in zip(itertools.count(1), sections): 
+        s = iter(section)
+        s = map(eval, s)
+        left, right = collect(list, s)
+        #print(f'{left = } {right = }')
+        #print(f'{in_order(left, right) = }')
+       
+        if in_order(left, right) == -1:
+            answer += i
+        
+    print(f'    {answer = }')
     
 def part2(fname: str):
     with open(fname) as f:
