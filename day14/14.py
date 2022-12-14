@@ -177,6 +177,8 @@ class Cave:
             drain(s)
             
         self.set(*self._source, '+')
+    
+    def source(self): return self._source
     def xlow(self): return self._xlow
     def xhigh(self): return self._xhigh
     def ylow(self): return self._ylow
@@ -202,8 +204,40 @@ def part1(fname: str):
         sections = read_sections(f)
     print(f'*** part 1 ***')
     cave = Cave(sections[0])
-    cave.print()
-
+    
+    def nextpos(cur) -> ty.Optional[tuple[int, int]]:
+        cx, cy = cur
+        moves = [ (0, +1), (-1, +1), (+1, +1) ]
+        for dx, dy in moves:
+            nx, ny = cx + dx, cy + dy
+            if cave.at(nx, ny) == '.': return (nx, ny)
+        return None
+    
+    # drop a piece of sand
+    # it stops when:
+    #   hits a barrier
+    #   reaches bottom edge
+    # if bottom edge: will fall forever, round over
+    # if rock, place an "o" and repeat
+    
+    
+    def drop() -> bool:
+        sand = cave.source()
+        while True:
+            sx, sy = sand
+            if sy == cave.yhigh():
+                return False
+            newpos = nextpos(sand)
+            if newpos is None:
+                cave.set(sx, sy, 'o')
+                return True
+            sand = newpos
+    
+    grains = 0
+    while drop() == True:
+        grains += 1
+    print(f'    {grains = }')
+    
 def part2(fname: str):
     with open(fname) as f:
         sections = read_sections(f)
