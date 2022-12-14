@@ -151,7 +151,7 @@ class Cave:
         assert xlow <= 500 <= xhigh
         assert ylow <= 0 <= yhigh
                 
-        xlow -= 1; xhigh += 1
+        xlow -= 1000; xhigh += 1000
         ylow -= 1; yhigh += 1
         
         def make_grid(nrows, ncols):
@@ -184,6 +184,9 @@ class Cave:
     def ylow(self): return self._ylow
     def yhigh(self): return self._yhigh
     
+    def _widen(self):
+        ...
+    
     def set(self, x, y, value):
         self._grid[y + self._yoffset][x + self._xoffset] = value
     def at(self, x, y):
@@ -208,12 +211,16 @@ def nextpos(cave, cur) -> ty.Optional[tuple[int, int]]:
         if cave.at(nx, ny) == '.': return (nx, ny)
     return None
 
-def drop(cave) -> bool:
+def drop(cave, floor=False) -> bool:
     sand = cave.source()
     while True:
         sx, sy = sand
         if sy == cave.yhigh():
-            return False
+            if not floor:
+                return False
+            else:
+                cave.set(sx, sy, 'o')
+                return True
         newpos = nextpos(cave, sand)
         if newpos is None:
             if (sx, sy) == cave.source():
@@ -243,10 +250,9 @@ def part2(fname: str):
     
     grains = 0
     while cave.at(*cave.source()) == '+':
-        drop(cave)
+        drop(cave, floor=True)
         grains += 1
-        print(f'\n\n=== {grains = }')
-        cave.print()
+        #print(f'\n\n=== {grains = }')
     print(f'    {grains = }')
 
 if __name__ == '__main__':
