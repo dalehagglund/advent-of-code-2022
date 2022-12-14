@@ -97,7 +97,7 @@ def mapinner(f, items):
         yield list(map(f, item))
 
 class Cave:
-    def __init__(self, lines):
+    def __init__(self, lines, floor=False):
         def to_coord(s) -> tuple[int, int]:
             x, y = map(int, s.split(","))
             return x, y
@@ -150,7 +150,7 @@ class Cave:
         assert ylow == 0
         assert xlow <= 500 <= xhigh
         assert ylow <= 0 <= yhigh
-        
+                
         xlow -= 1; xhigh += 1
         ylow -= 1; yhigh += 1
         
@@ -199,42 +199,38 @@ class Cave:
             )
         )
 
+    
+def nextpos(cave, cur) -> ty.Optional[tuple[int, int]]:
+    cx, cy = cur
+    moves = [ (0, +1), (-1, +1), (+1, +1) ]
+    for dx, dy in moves:
+        nx, ny = cx + dx, cy + dy
+        if cave.at(nx, ny) == '.': return (nx, ny)
+    return None
+
+def drop(cave) -> bool:
+    sand = cave.source()
+    while True:
+        sx, sy = sand
+        if sy == cave.yhigh():
+            return False
+        newpos = nextpos(cave, sand)
+        if newpos is None:
+            if (sx, sy) == cave.source():
+                print(f'    plugged source')
+            cave.set(sx, sy, 'o')
+            return True
+        sand = newpos
+
 def part1(fname: str):
     with open(fname) as f:
         sections = read_sections(f)
     print(f'*** part 1 ***')
+
     cave = Cave(sections[0])
     
-    def nextpos(cur) -> ty.Optional[tuple[int, int]]:
-        cx, cy = cur
-        moves = [ (0, +1), (-1, +1), (+1, +1) ]
-        for dx, dy in moves:
-            nx, ny = cx + dx, cy + dy
-            if cave.at(nx, ny) == '.': return (nx, ny)
-        return None
-    
-    # drop a piece of sand
-    # it stops when:
-    #   hits a barrier
-    #   reaches bottom edge
-    # if bottom edge: will fall forever, round over
-    # if rock, place an "o" and repeat
-    
-    
-    def drop() -> bool:
-        sand = cave.source()
-        while True:
-            sx, sy = sand
-            if sy == cave.yhigh():
-                return False
-            newpos = nextpos(sand)
-            if newpos is None:
-                cave.set(sx, sy, 'o')
-                return True
-            sand = newpos
-    
     grains = 0
-    while drop() == True:
+    while drop(cave) == True:
         grains += 1
     print(f'    {grains = }')
     
@@ -242,6 +238,16 @@ def part2(fname: str):
     with open(fname) as f:
         sections = read_sections(f)
     print(f'*** part 2 ***')
+
+    cave = Cave(sections[0], floor=True)
+    
+    grains = 0
+    while cave.at(*cave.source()) == '+':
+        drop(cave)
+        grains += 1
+        print(f'\n\n=== {grains = }')
+        cave.print()
+    print(f'    {grains = }')
 
 if __name__ == '__main__':
     part1(sys.argv[1])
