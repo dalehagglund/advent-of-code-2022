@@ -92,12 +92,118 @@ def convert_ints(items: list[str]) -> list:
     
 def nth(n, items): return items[n]
 def prod(items): reduce(operator.mul, items, 1)
+def mapinner(f, items):
+    for item in items:
+        yield list(map(f, item))
+
+class Cave:
+    def __init__(self, lines):
+        def to_coord(s) -> tuple[int, int]:
+            x, y = map(int, s.split(","))
+            return x, y
+        def make_grid(n, m):
+            return [
+                [ "." for _ in range(m) ]
+                for _ in range(n)
+            ]
+        def draw_segment(start, end):
+            sx, sy = start
+            ex, ey = end
+            if sx == ex:
+                for y in range(min(sy, ey), max(sy, ey) + 1):
+                    self.set(sx, y, "#") 
+            elif sy == ey:
+                for x in range(min(sx, ex), max(sx, ex) + 1):
+                    self.set(x, sy, "#")
+            else:
+                assert False, f'huh? bad coords {start}, {end}'
+        def process_line(chain):
+            s = pairwise(chain)
+            s = observe(draw, s)
+            drain(s)
+
+        s = iter(lines)
+        #s = observe(partial(print, "#1"), s)
+        s = map(lambda line: line.split(" -> "), s)
+        #s = observe(partial(print, "#2"), s)
+        s = mapinner(to_coord, s)
+        #s = observe(partial(print, "#3"), s)
+        chains = collect(list, s)
+
+        xlow, xhigh = float('+inf'), float('-inf')
+        ylow, yhigh = 0, float('-inf')
+        def find_bounds(x, y):
+            nonlocal xlow, xhigh, ylow, yhigh
+            if x < xlow: xlow = x
+            elif x > xhigh: xhigh = x
+            
+            if y < ylow: ylow = y
+            elif y > yhigh: yhigh = y
+
+        s = iter(chains)
+        s = itertools.chain.from_iterable(s)
+        s = observe(star(find_bounds), s)
+        s = drain(s)
+
+        assert xlow < xhigh
+        assert ylow < yhigh
+        assert ylow == 0
+        assert xlow <= 500 <= xhigh
+        assert ylow <= 0 <= yhigh
+        
+        xlow -= 1; xhigh += 1
+        ylow -= 1; yhigh += 1
+        
+        def make_grid(nrows, ncols):
+            return [
+                [ "." for _ in range(ncols) ]
+                for _ in range(nrows)
+            ]
+
+        self._nrows = yhigh - ylow + 1
+        self._ncols = xhigh - xlow + 1
+        self._xlow, self._xhigh = xlow, xhigh
+        self._ylow, self._yhigh = ylow, yhigh
+        self._xoffset = -xlow
+        self._yoffset = -ylow
+
+        self._grid = make_grid(self._nrows, self._ncols)
+        
+        self._source = (500, 0)
+        
+        for chain in chains:
+            s = pairwise(chain)
+            s = observe(star(draw_segment), s)
+            drain(s)
+            
+        self.set(*self._source, '+')
+    def xlow(self): return self._xlow
+    def xhigh(self): return self._xhigh
+    def ylow(self): return self._ylow
+    def yhigh(self): return self._yhigh
+    
+    def set(self, x, y, value):
+        self._grid[y + self._yoffset][x + self._xoffset] = value
+    def at(self, x, y):
+        return self._grid[y + self._yoffset][x + self._xoffset]
+    def print(self):
+        print(
+            "\n".join(
+                "".join(
+                    self.at(x, y)
+                    for x in range(self.xlow(), self.xhigh()+1)
+                )
+                for y in range(self.ylow(), self.yhigh()+1)
+            )
+        )
 
 def part1(fname: str):
     with open(fname) as f:
         sections = read_sections(f)
     print(f'*** part 1 ***')
-    
+    cave = Cave(sections[0])
+    cave.print()
+
 def part2(fname: str):
     with open(fname) as f:
         sections = read_sections(f)
