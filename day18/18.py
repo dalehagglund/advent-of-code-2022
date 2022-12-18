@@ -182,13 +182,9 @@ def part2(fname: str):
     ymin, ymax = minmax(map(partial(nth, 1), droplets))
     zmin, zmax = minmax(map(partial(nth, 2), droplets))
     
-    xmin -= 1
-    ymin -= 1
-    zmin -= 1
+    xmin -= 1; ymin -= 1; zmin -= 1
+    xmax += 1; ymax += 1; zmax += 1
     
-    xmax += 1
-    ymax += 1
-    zmax += 1
     print('bounding box', (xmin, ymin, zmin), '...', (xmax, ymax, zmax))
     
     external = flood((xmin, ymin, zmin), (xmax, ymax, zmax), droplets)
