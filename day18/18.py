@@ -108,11 +108,6 @@ class Cell(ty.NamedTuple):
     y: int
     z: int
         
-@dataclass(frozen=True)
-class Face:
-    cell: Cell
-    dir: tuple[int, int, int]        
-
 directions = [
     (0, 0, 1), ( 0,  0, -1),
     (0, 1, 0), ( 0, -1,  0),
@@ -181,7 +176,7 @@ def part2(fname: str):
         
     droplets = read_cells(sections[0])
     print('read', len(droplets), 'droplets')
-    print(droplets)
+    #print(droplets)
 
     xmin, xmax = minmax(map(partial(nth, 0), droplets))
     ymin, ymax = minmax(map(partial(nth, 1), droplets))
