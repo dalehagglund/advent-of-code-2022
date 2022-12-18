@@ -296,24 +296,6 @@ class SensorTests(unittest.TestCase):
             with self.subTest(y=y, expected=expected):
                 self.assertEqual(expected, sensor.xinterval_at(y))
         
-def bounding_box(sensors: list[Sensor]) -> tuple[Point, Point]:
-    xmin = ymin = float('+inf')
-    xmax = ymax = float('-inf')
-    
-    def update_minmax(p: Point):
-        nonlocal xmin, ymin, xmax, ymax
-        if p.x < xmin: xmin = p.x
-        if p.x > xmax: xmax = p.x
-        
-        if p.y < ymin: ymin = p.y
-        if p.y > ymax: ymax = p.y
-    
-    for s in sensors:
-        update_minmax(s.loc)
-        update_minmax(s.beacon)     
-
-    return Point(xmin, ymin), Point(xmax, ymax)
-
 def read_sensors(lines: list[str]) -> list[Sensor]:
     s = iter(lines)
     s = map(partial(re.sub, "[=,:]", " "), s)
