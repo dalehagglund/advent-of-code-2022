@@ -110,17 +110,33 @@ class Interval:
     def __init__(self, lb: int, ub: int):
         self._lb = lb
         self._ub = ub
-    
     def intersects(self, other: 'Interval') -> bool:
-        return not (
-            other._lb >= self._ub or
-            self._lb >= other._ub
-        )
+        if other._ub <= self._lb: return False
+        if self._ub <= other._lb: return False
+        return True
+        
     def adjacent(self, other: 'Interval') -> bool:
         return (
             self._ub == other._lb or
             self._lb == other._ub
         )
+        
+    def _contains(self, other) -> bool:
+        return self._lb <= other._lb <= other._ub <= self._ub
+        
+    def intersection(self, other: 'Interval') -> 'Interval':
+        if not self.intersects(other): return Interval.empty()
+        
+        if self._contains(other):
+            return other
+        elif other._contains(self):
+            return self
+        elif self._lb <= other._lb <= self._ub <= other._ub:
+            return Interval(other._lb, self._ub)
+        elif other._lb <= self._lb <= other._ub <= self._ub:
+            return Interval(self._lb, other._ub)
+        
+        assert False
         
     def contains(self, x: int) -> bool:
         return self._lb <= x < self._ub
@@ -137,6 +153,15 @@ class Interval:
         return self._ub - self._lb
         
 class IntervalTests(unittest.TestCase):
+    def test_intersects(self):
+        cases = [
+            ( True, Interval(0, 17), Interval(11, 21) ),
+        ]
+        for expected, intv1, intv2 in cases:
+            with self.subTest(expected=expected, intv1=intv1, intv2=intv2):
+                self.assertEqual(expected, intv1.intersects(intv2))
+                self.assertEqual(expected, intv2.intersects(intv1))
+
     def test_adjacent(self):
         i1 = Interval(1, 2)
         i2 = Interval(2, 3)
@@ -166,6 +191,23 @@ class IntervalTests(unittest.TestCase):
         self.assertEqual(
             Intv(0, 10),
             Intv(5, 10).merge(Intv(0, 5)))
+    def test_intersection(self):
+        cases = [
+            # interval1        interval2         expected
+            ( Interval(0, 5),  Interval.empty(), Interval.empty() ),
+            ( Interval(0, 5),  Interval(10, 15), Interval.empty() ),
+            ( Interval(0, 5),  Interval(0, 5),   Interval(0, 5)   ),
+            ( Interval(0, 5),  Interval(2, 3),   Interval(2, 3)   ),
+            ( Interval(0, 5),  Interval(0, 4),   Interval(0, 4)   ),
+            ( Interval(0, 5),  Interval(1, 5),   Interval(1, 5)   ),
+            ( Interval(0, 5),  Interval(4, 9),   Interval(4, 5),  ),
+            
+            ( Interval(0, 21), Interval(-3, 8),  Interval(0, 8)   )
+        ]
+        for intv1, intv2, expected in cases:
+            with self.subTest(intv1=intv1, intv2=intv2, expected=expected):
+                self.assertEqual(expected, intv1.intersection(intv2))
+                self.assertEqual(expected, intv2.intersection(intv1))
     def test_merge_overlapped(self):
         cases = [
             (Interval(0, 7), Interval(6, 10)),
@@ -217,7 +259,7 @@ class Sensor:
         if ydelta > self._radius: return Interval.empty()
         xdelta = abs(self._radius - ydelta)
         assert xdelta + ydelta == self._radius
-        print('...', self.loc, f'{y = }', xdelta, ydelta)
+        # print('...', self.loc, f'{y = }', xdelta, ydelta)
         return Interval(self.loc.x - xdelta, self.loc.x + xdelta + 1)
 
 class SensorTests(unittest.TestCase):
@@ -271,26 +313,35 @@ def bounding_box(sensors: list[Sensor]) -> tuple[Point, Point]:
         update_minmax(s.beacon)     
 
     return Point(xmin, ymin), Point(xmax, ymax)
+
+def read_sensors(lines: list[str]) -> list[Sensor]:
+    s = iter(lines)
+    s = map(partial(re.sub, "[=,:]", " "), s)
+    s = map(str.split, s)
+    s = map(lambda t: (nth(3, t), nth(5, t), nth(11, t), nth(13, t)), s)
+    s = map(partial(convert_fields, (int, int, int, int)), s)
+    s = map(lambda t: Sensor(Point(t[0], t[1]), Point(t[2], t[3])), s)
+    return collect(list, s)
     
+def merge_intervals(intervals: list[Interval]) -> list[Interval]:
+    if len(intervals) == 0: return []
+    intervals = sorted(intervals, key=lambda intv: intv._lb)
+    merged = [intervals[0]]
+    for item in intervals[1:]:
+        cur = merged[-1]
+        # print(f'    {cur = } {item = }')
+        if cur.intersects(item) or cur.adjacent(item):
+            merged[-1] = cur.merge(item)
+        else:
+            merged.append(item)
+    return merged
 
 def part1(fname: str, ytarget: int):
     with open(fname) as f:
         sections = read_sections(f)
     print(f'*** part 1 ***')
     
-    sees: dict[Sensor, Beacon] = {}
-    
-    s = iter(sections[0])
-    s = map(partial(re.sub, "[=,:]", " "), s)
-    s = map(str.split, s)
-    s = map(lambda t: (nth(3, t), nth(5, t), nth(11, t), nth(13, t)), s)
-    s = map(partial(convert_fields, (int, int, int, int)), s)
-    s = map(lambda t: Sensor(Point(t[0], t[1]), Point(t[2], t[3])), s)
-    s = observe(print, s)
-    sensors = collect(list, s)
-    
-    ll, ur = bounding_box(sensors)
-    print(ll, ur)
+    sensors = read_sensors(sections[0])
     
     s = map(lambda intv: intv.xinterval_at(ytarget), sensors)
     s = filter(lambda intv: len(intv) > 0, s)
@@ -324,12 +375,52 @@ def part1(fname: str, ytarget: int):
             excluded -= 1
             
     print(f'    {excluded = }')
-        
-def part2(fname: str, row: int):
+
+def find_intervals(sensors, xrange: Interval, y: int) -> list[Interval]:
+    for s in sensors:
+        intv = s.xinterval_at(y)
+        intv = intv.intersection(xrange)
+        if intv == Interval.empty(): continue
+        yield intv
+
+def part2(fname: str, boxsize: int):
     with open(fname) as f:
         sections = read_sections(f)
     print(f'*** part 2 ***')
+    
+    sensors = read_sensors(sections[0])
+    xinterval = Interval(0, boxsize + 1)
+    
+    print(f'{xinterval = }')
+    point = None
+    for y in range(boxsize + 1):
+        if y % 10000 == 0: print(f'{y = }')
+        intervals = list(find_intervals(sensors, xinterval, y))
+        intervals = merge_intervals(intervals)
+        #print(f'    {intervals = }')
+        assert 0 <= len(intervals) <= 2
+        if len(intervals) == 0:
+            continue
+        elif len(intervals) == 2:
+            point = Point(x=intervals[0]._ub, y=y)
+            break
+        elif intervals[0] == xinterval:
+            continue
+        elif intervals[0]._lb == 0:
+            assert len(intervals[0]) == boxsize - 1
+            point = Point(x=intervals[0]._ub, y=y)
+            break
+        elif intervals[0]._lb == 1:
+            assert len(intervals[0]) == boxsize - 1
+            point = Point(x=0, y=y)
+            break
+        else:
+            assert False
+
+    print(f'***   found empty point {point}')
+    x, y = point
+    print(f'***   tuning freq = {x * 4000000 + y}')
 
 if __name__ == '__main__':
     part1(sys.argv[1], int(sys.argv[2]))
-    part2(sys.argv[1], int(sys.argv[2]))
+    part2(sys.argv[1], int(sys.argv[3]))
