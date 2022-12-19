@@ -18,6 +18,7 @@ from functools import reduce, cmp_to_key
 import operator
 import collections
 from copy import deepcopy
+import unittest
 
 def star(f):
     return lambda t: f(*t)
@@ -136,8 +137,7 @@ class Interval:
 class Point(ty.NamedTuple):
     x: int
     y: int
-    
-    
+
 class Tile(abc.ABC):
     def __init__(self, name, short, grid):
         self._name = name
@@ -157,6 +157,70 @@ class Tile(abc.ABC):
     def height(self) -> int: return self._nrows
     def __repr__(self) -> str:
         return f'Tile(name = {self._name!r}, short = {self._short}, grid = {self._grid!r})'
+        
+class FlexGrid:
+    def __init__(self, seglen):
+        self._ymin = 0
+        self._seglen = seglen
+        self._loseg = self._empty_seg()
+        self._hiseg = self._empty_seg()
+    def _empty_seg(self):
+        return [
+            [ "." ] * 7
+            for _ in range(self._seglen)
+        ]        
+    def ymin(self): return self._ymin
+    def ymax(self): return self._ymin + 2 * self._seglen
+    def at(self, x, y) -> str:
+        self._assert_in_bounds(x, y)
+        seg, y = self._to_seg(y)
+        return seg[y][x]
+    def set(self, x, y, value):
+        self._assert_in_bounds(x, y)
+        seg, y = self._to_seg(y)
+        seg[y][x] = value
+    def _to_seg(self, y: int):
+        if y >= self._seglen: return self._hiseg, y - self._seglen
+        else:                 return self._loseg, y
+    def _assert_in_bounds(self, x, y):
+        if not (0 <= x < 7):
+            raise ValueError(f'x out of bounds: {x = }')
+        if not (self.ymin() <= y < self.ymax()):
+            raise ValueError(f'y out of bounds: {y = }')
+            
+class FlexGridTests(unittest.TestCase):
+    def test_initial_ymin(self):
+        g = FlexGrid(4)
+        self.assertEqual(0, g.ymin())
+    def test_initial_height(self):
+        g = FlexGrid(4)
+        self.assertEqual(2 * 4, g.ymax() - g.ymin())
+    def test_in_bounds_at(self):
+        g = FlexGrid(4)
+        self.assertEqual(g.at(0, 0), ".")
+        self.assertEqual(g.at(0, 7), ".")
+    def test_out_of_bounds_indexing(self):
+        g = FlexGrid(4)
+        cases = [
+            (-1, 0),
+            (8, 0),
+            (0, -1),
+            (0, 9),
+        ]
+        for x, y in cases:
+            with self.subTest(x=x, y=y):
+                with self.assertRaises(ValueError):
+                    g.at(x, y)
+    def test_in_bounds_set(self):
+        g = FlexGrid(4)
+        cases = [
+            ("+", 0, 0),
+            ("@", 6, 7),
+        ]
+        for value, x, y in cases:
+            with self.subTest(value=value, x=x, y=y):
+                g.set(x, y, value)
+                self.assertEqual(value, g.at(x, y))
         
 class Tower:
     def __init__(self):
@@ -259,28 +323,11 @@ square = Tile(
                 [ 1, 1 ],
             ]
         )
-
         
-def part1(fname: str):
-    with open(fname) as f:
-        sections = read_sections(f)
-    print(f'*** part 1 ***')
-    
-    if False:
-        tower = Tower()
-        tower.start(horiz)
-        tower.print()
-        tower.push(">")
-        tower.print()
-        tower.drop()
-        tower.print()
-        tower.place()
-        tower.print()
-        return
-
+def solve(nrocks: int, jets: str) -> int:
     tower = Tower()
     tiles = itertools.cycle([horiz, cross, corner, vert, square])
-    jets = itertools.cycle(sections[0][0])
+    jets = itertools.cycle(jets)
     for i, tile in zip(itertools.count(1), tiles):
         tower.start(tile)
         #tower.print(f'rock {i} {tile.name()} starts falling')
@@ -293,16 +340,23 @@ def part1(fname: str):
             if not keep_going: tower.place()
             #\tower.print(f'rock {i} drop')
         #tower.print(f'rock {i} finished falling')
-        if i == 2022:
+        if i == nrocks:
             break
+
+    return tower._maxrock
         
-    print(f'   height = {tower._maxrock}')
+def part1(fname: str):
+    with open(fname) as f:
+        sections = read_sections(f)
+    print(f'*** part 1 ***')
+    print(f'   height = {solve(2022, sections[0][0])}')
         
 
 def part2(fname: str):
     with open(fname) as f:
         sections = read_sections(f)
     print(f'*** part 2 ***')
+    print(f'   height = {solve(1000000000000, sections[0][0])}')
 
 if __name__ == '__main__':
     part1(sys.argv[1])
