@@ -139,11 +139,6 @@ class Grid:
             self.at(i, j) in ".#"
             for i, j in product(nrows, ncols)
         )                
-        # if strict: 
-            # assert all(
-                # 1 <= i < nrows - 1 and 1 <= j < ncols - 1
-                # for i, j in self.elf_positions()
-            # )
 
     def bounding_box(self): 
         mini = minj = float('+inf')
@@ -164,8 +159,8 @@ class Grid:
         
         return (mini, minj), (maxi, maxj)
         
-    def elf_positions(self):
-        return iter(self._elves)
+    def elf_positions(self): return iter(self._elves)
+    def elf_count(self): return len(self._elves)
         
     def at(self, i, j):
         return "#" if (i, j) in self._elves else "."
@@ -330,12 +325,16 @@ def part1(fname: str):
     directions = [NORTH, SOUTH, WEST, EAST]
     
     for i in itertools.count(1):
-        print(f'    iteration {i}: {directions = }')
+        print(f'    iteration {i}:')
+        print(f'       {g.elf_count() = }')
+        print(f'       {directions = }')
+        crowded = sum(1 for pos in g.elf_positions() if g.crowded(*pos))
+        print(f'       {crowded = }')
         old = set(g.elf_positions())
         proposals = compute_proposals(g, directions)
         new = new_positions(proposals)
         if old == new:
-            print(f'!!!  no change in round {i}')
+            print(f'***     no change in round {i}')
             break
             
         g.update_elves(new_positions(proposals))
