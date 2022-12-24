@@ -144,6 +144,25 @@ class Grid:
                 1 <= i < self._nrows - 1 and 1 <= j < self._ncols - 1
                 for i, j in self.elf_positions()
             )
+            
+    def bounding_box(self): 
+        mini = minj = float('+inf')
+        maxi = maxj = float('-inf')
+
+        def updatemin(i, j):
+            nonlocal mini, minj
+            if i < mini: mini = i
+            if j < minj: minj = j
+        def updatemax(i, j):
+            nonlocal maxi, maxj
+            if i > maxi: maxi = i
+            if j > maxj: maxj = j         
+        s = self.elf_positions()
+        s = observe(star(updatemin), s)
+        s = observe(star(updatemax), s)
+        drain(s)
+        
+        return (mini, minj), (maxi, maxj)
         
     def elf_positions(self):
         return (
@@ -221,7 +240,7 @@ class GridProposalTests(unittest.TestCase):
         )
 
             
-class GridMovementChecks(unittest.TestCase):
+class GridQueries(unittest.TestCase):
     def test_crowded_asserts_on_empty_space(self):
         g = Grid("... .#. ...".split())
         self.assertRaises(AssertionError, g.crowded, 0, 0)
@@ -237,7 +256,19 @@ class GridMovementChecks(unittest.TestCase):
         for direction in [NORTH, SOUTH, EAST, WEST]:
             with self.subTest(dir=direction, edge=EDGE[direction]):
                 self.assertTrue(g.can_move(1, 1, direction))
-
+    def test_bounding_box(self):
+        cases = [
+            [ "... .#. ...", (1, 1), (1, 1) ],
+            [ "#.. ... ..#", (0, 0), (2, 2) ],
+        ]
+        
+        for input, exp_ul, exp_lr in cases:
+            with self.subTest(input=input, exp_ul=exp_ul, exp_lr=exp_lr):
+                g = Grid(input.split(), strict=False)
+                ul, lr = g.bounding_box()
+                self.assertEqual(exp_ul, ul)
+                self.assertEqual(exp_lr, lr)
+            
 class GridConstructorTests(unittest.TestCase):
     def test_center_elf_3x3_grid(self):
         g = Grid([
