@@ -138,21 +138,20 @@ class Grid:
             self._grid[i][j] in ".#"
             for i, j in product(self._nrows, self._ncols)
         )
-        
-        self._elves = [
-            (i, j)
-            for i, j in product(self._nrows, self._ncols)
-            if self._grid[i][j] == "#"
-        ]
-        
+                
         if strict: 
             assert all(
                 1 <= i < self._nrows - 1 and 1 <= j < self._ncols - 1
-                for i, j in self._elves
+                for i, j in self.elf_positions()
             )
         
     def elf_positions(self):
-        return iter(self._elves)
+        return (
+            (i, j)
+            for i, j in product(self._nrows, self._ncols)
+            if self._grid[i][j] == "#"
+        )
+        #return iter(self._elves)
         
     def at(self, i, j):
         return self._grid[i][j]
@@ -180,9 +179,15 @@ class Grid:
                 return i + di, j + dj
         return i, j
     
+    def update_elves(self, new_positions):
+        for i, j in self.elf_positions():
+            self._grid[i][j] = "."
+        for i, j in new_positions:
+            self._grid[i][j] = "#"
+    
     def print(self):
         print(f'nrow = {self._nrows} ncol = {self._ncols}')
-        print(f'elves = {self._elves}')
+        print(f'elves = {list(self.elf_positions())}')
         for row in self._grid:
             print("".join(row))
 
@@ -259,6 +264,29 @@ class GridConstructorTests(unittest.TestCase):
             with self.subTest(input=input):
                 self.assertRaises(AssertionError, Grid, input.split())
 
+def compute_proposals(grid, directions):
+    proposals = collections.defaultdict(set)
+    cur_positions = list(grid.elf_positions())
+    for curpos in cur_positions:
+        newpos = grid.new_position(*curpos, directions)
+        proposals[newpos].add(curpos)        
+    assert len(cur_positions) == sum(map(len, proposals.values()))
+    assert all(
+        sum(map(lambda items: curpos in items, proposals.values())) == 1
+        for curpos in cur_positions
+    )
+    return proposals
+
+def new_positions(proposals):
+    new_position = {}
+    for new, orig_positions in proposals.items():
+        if len(orig_positions) == 1:
+            new_position[next(iter(orig_positions))] = new
+        else:
+            for orig_pos in orig_positions:
+                new_position[orig_pos] = orig_pos
+    return list(new_position.values())
+
 def part1(fname: str):
     with open(fname) as f:
         sections = read_sections(f)
@@ -267,18 +295,15 @@ def part1(fname: str):
     g.print()
     
     directions = [NORTH, SOUTH, WEST, EAST]
-    for i, j in g.elf_positions():
-        if not g.crowded(i, j):
-            print(f'{{i, j) => stays put')
-            continue
-
-        for dir in directions:
-            if g.can_move(i, j, dir):
-                print(f'{(i, j)} => move {dir}')
-                break
-        
     
-
+    for i in range(3):
+        print(f'    iteration {i}: {directions = }')
+        proposals = compute_proposals(g, directions)
+        g.update_elves(new_positions(proposals))
+        directions.insert(-1, directions.pop(0))
+        g.print()
+    
+    
 def part2(fname: str):
     with open(fname) as f:
         sections = read_sections(f)
