@@ -124,33 +124,27 @@ EDGE = {
 
 class Grid:
     def __init__(self, description: list[str], strict=True):
-        self._nrows = len(description)
-        self._ncols = len(description[0])
-        self._grid = [
-            list(line)
-            for line in description
-        ]
-        assert all(
-            len(row) == self._ncols
-            for row in self._grid
-        )
-        assert all(
-            self._grid[i][j] in ".#"
-            for i, j in product(self._nrows, self._ncols)
-        )
-                
-        if strict: 
-            assert all(
-                1 <= i < self._nrows - 1 and 1 <= j < self._ncols - 1
-                for i, j in self.elf_positions()
-            )
+        nrows = len(description)
+        ncols = len(description[0])
+        assert all(len(line) == ncols for line in description)
+        
         self._elves = set(
             (i, j)
             for i, j 
-            in product(self._nrows, self._ncols)
+            in product(nrows, ncols)
             if description[i][j] == "#"
         )
-            
+
+        assert all(
+            self.at(i, j) in ".#"
+            for i, j in product(nrows, ncols)
+        )                
+        # if strict: 
+            # assert all(
+                # 1 <= i < nrows - 1 and 1 <= j < ncols - 1
+                # for i, j in self.elf_positions()
+            # )
+
     def bounding_box(self): 
         mini = minj = float('+inf')
         maxi = maxj = float('-inf')
@@ -171,28 +165,23 @@ class Grid:
         return (mini, minj), (maxi, maxj)
         
     def elf_positions(self):
-        return (
-            (i, j)
-            for i, j in product(self._nrows, self._ncols)
-            if self._grid[i][j] == "#"
-        )
-        #return iter(self._elves)
+        return iter(self._elves)
         
     def at(self, i, j):
-        return self._grid[i][j]
+        return "#" if (i, j) in self._elves else "."
         
     def crowded(self, i, j) -> bool:
-        assert self._grid[i][j] == "#"
+        assert self.at(i, j) == "#"
         return any(
-            self._grid[i + di][j + dj] == "#"
+            self.at(i + di, j + dj) == "#"
             for di, dj in product([-1, 0, 1], repeat=2)
             if not (di == dj == 0)
         )
         
     def can_move(self, i, j, dir) -> bool:
-        assert self._grid[i][j] == "#"
+        assert self.at(i, j) == "#"
         return all(
-            self._grid[i + di][j + dj] == "."
+            self.at(i + di, j + dj) == "."
             for di, dj in EDGE[dir]
         )
         
@@ -205,16 +194,16 @@ class Grid:
         return i, j
     
     def update_elves(self, new_positions):
-        for i, j in self.elf_positions():
-            self._grid[i][j] = "."
-        for i, j in new_positions:
-            self._grid[i][j] = "#"
+        self._elves = set(new_positions)
     
     def print(self):
-        print(f'nrow = {self._nrows} ncol = {self._ncols}')
         print(f'elves = {list(self.elf_positions())}')
-        for row in self._grid:
-            print("".join(row))
+        (imin, jmin), (imax, jmax) = self.bounding_box()
+        for i in range(imin, imax + 1):
+            print("".join(
+                self.at(i, j)
+                for j in range(jmin, jmax+1)
+            ))
 
 class GridProposalTests(unittest.TestCase):
     def test_uncrowded(self):
@@ -224,12 +213,9 @@ class GridProposalTests(unittest.TestCase):
     def test_one_direction_free(self):
         directions = [ NORTH, EAST, SOUTH, WEST ]
         cases = [
-            [ "... ### .#.", (0, 1) ],
-            
-            [ ".#. ##. .#.", (1, 2) ],
-            
-            [ ".#. ### ...", (2, 1) ],
-            
+            [ "... ### .#.", (0, 1) ],            
+            [ ".#. ##. .#.", (1, 2) ],            
+            [ ".#. ### ...", (2, 1) ],            
             [ ".#. .## .#.", (1, 0) ],
         ]
         for input, expected in cases:
@@ -332,7 +318,7 @@ def new_positions(proposals):
         else:
             for orig_pos in orig_positions:
                 new_position[orig_pos] = orig_pos
-    return list(new_position.values())
+    return set(new_position.values())
 
 def part1(fname: str):
     with open(fname) as f:
@@ -343,12 +329,24 @@ def part1(fname: str):
     
     directions = [NORTH, SOUTH, WEST, EAST]
     
-    for i in range(3):
+    for i in itertools.count(1):
         print(f'    iteration {i}: {directions = }')
+        old = set(g.elf_positions())
         proposals = compute_proposals(g, directions)
+        new = new_positions(proposals)
+        if old == new:
+            print(f'!!!  no change in round {i}')
+            break
+            
         g.update_elves(new_positions(proposals))
-        directions.insert(-1, directions.pop(0))
-        g.print()
+        directions.append(directions.pop(0))
+        #g.print()
+        
+        if i == 10:
+            (imin, jmin), (imax, jmax) = g.bounding_box()
+            area = (imax - imin + 1) * (jmax - jmin + 1)
+            empty = area - len(list(g.elf_positions()))
+            print(f'***    round 10 {empty = }')
     
     
 def part2(fname: str):
