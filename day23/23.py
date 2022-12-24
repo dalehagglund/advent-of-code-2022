@@ -144,6 +144,12 @@ class Grid:
                 1 <= i < self._nrows - 1 and 1 <= j < self._ncols - 1
                 for i, j in self.elf_positions()
             )
+        self._elves = set(
+            (i, j)
+            for i, j 
+            in product(self._nrows, self._ncols)
+            if description[i][j] == "#"
+        )
             
     def bounding_box(self): 
         mini = minj = float('+inf')
@@ -260,14 +266,24 @@ class GridQueries(unittest.TestCase):
         cases = [
             [ "... .#. ...", (1, 1), (1, 1) ],
             [ "#.. ... ..#", (0, 0), (2, 2) ],
-        ]
-        
+        ]        
         for input, exp_ul, exp_lr in cases:
             with self.subTest(input=input, exp_ul=exp_ul, exp_lr=exp_lr):
                 g = Grid(input.split(), strict=False)
                 ul, lr = g.bounding_box()
                 self.assertEqual(exp_ul, ul)
                 self.assertEqual(exp_lr, lr)
+    def test_elf_positions(self):
+        cases = [
+            [ ".#. ### .#.", { (0,1), (1, 0), (1,  1), (1, 2), (2, 1) } ]
+        ]
+        for input, expected in cases:
+            with self.subTest(expected=expected, input=input):
+                g = Grid(input.split(), strict=False)
+                self.assertEqual(
+                    expected,
+                    set(g.elf_positions())
+                )
             
 class GridConstructorTests(unittest.TestCase):
     def test_center_elf_3x3_grid(self):
