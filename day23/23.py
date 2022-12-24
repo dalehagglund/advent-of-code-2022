@@ -110,8 +110,20 @@ def mapinner(f, items):
     for item in items:
         yield list(map(f, item))
 
+NORTH = (-1,  0)
+SOUTH = (+1,  0)
+EAST  = ( 0, +1)
+WEST  = ( 0, -1)
+
+EDGE = {
+    NORTH: [ (-1, -1), (-1,  0), (-1, +1) ],
+    SOUTH: [ (+1, -1), (+1,  0), (+1, +1) ],
+    EAST:  [ (-1, +1), ( 0, +1), (+1, +1) ],
+    WEST:  [ (-1, -1), ( 0, -1), (+1, -1) ],
+}
+
 class Grid:
-    def __init__(self, description: list[str]):
+    def __init__(self, description: list[str], strict=True):
         self._nrows = len(description)
         self._ncols = len(description[0])
         self._grid = [
@@ -132,10 +144,12 @@ class Grid:
             for i, j in product(self._nrows, self._ncols)
             if self._grid[i][j] == "#"
         ]
-        assert all(
-            1 <= i < self._nrows - 1 and 1 <= j < self._ncols - 1
-            for i, j in self._elves
-        )
+        
+        if strict: 
+            assert all(
+                1 <= i < self._nrows - 1 and 1 <= j < self._ncols - 1
+                for i, j in self._elves
+            )
         
     def elf_positions(self):
         return iter(self._elves)
@@ -150,14 +164,62 @@ class Grid:
             for di, dj in product([-1, 0, 1], repeat=2)
             if not (di == dj == 0)
         )
+        
+    def can_move(self, i, j, dir) -> bool:
+        assert self._grid[i][j] == "#"
+        return all(
+            self._grid[i + di][j + dj] == "."
+            for di, dj in EDGE[dir]
+        )
+        
+    def new_position(self, i, j, directions):
+        if not self.crowded(i, j): return i, j
+        for dir in directions:
+            if self.can_move(i, j, dir):
+                di, dj = dir
+                return i + di, j + dj
+        return i, j
     
     def print(self):
         print(f'nrow = {self._nrows} ncol = {self._ncols}')
         print(f'elves = {self._elves}')
         for row in self._grid:
             print("".join(row))
+
+class GridProposalTests(unittest.TestCase):
+    def test_uncrowded(self):
+        g = Grid("... .#. ...".split())
+        self.assertEqual((1, 1), g.new_position(1, 1, []))
+        
+    def test_one_direction_free(self):
+        directions = [ NORTH, EAST, SOUTH, WEST ]
+        cases = [
+            [ "... ### .#.", (0, 1) ],
             
-class GridMovementTests(unittest.TestCase):
+            [ ".#. ##. .#.", (1, 2) ],
+            
+            [ ".#. ### ...", (2, 1) ],
+            
+            [ ".#. .## .#.", (1, 0) ],
+        ]
+        for input, expected in cases:
+            with self.subTest(input=input, expected=expected):
+                g = Grid(input.split(), strict=False)
+                self.assertEqual(expected, g.new_position(1, 1, directions))
+    
+    def test_all_directions_blocked(self):
+        directions = [ NORTH, EAST, SOUTH, WEST ]
+        g = Grid(".#. ### .#.".split(), strict=False)
+        self.assertEqual(
+            (1, 1),
+            g.new_position(1, 1, directions)
+        )
+
+            
+class GridMovementChecks(unittest.TestCase):
+    def test_crowded_asserts_on_empty_space(self):
+        g = Grid("... .#. ...".split())
+        self.assertRaises(AssertionError, g.crowded, 0, 0)
     def test_not_crowded(self):
         g = Grid("... .#. ...".split())
         self.assertFalse(g.crowded(1, 1))
@@ -165,6 +227,11 @@ class GridMovementTests(unittest.TestCase):
          g = Grid("..... .##.. ..... ..... .....".split())
          self.assertTrue(g.crowded(1, 1))
          self.assertTrue(g.crowded(1, 2))
+    def test_can_move(self):
+        g = Grid("... .#. ...".split())
+        for direction in [NORTH, SOUTH, EAST, WEST]:
+            with self.subTest(dir=direction, edge=EDGE[direction]):
+                self.assertTrue(g.can_move(1, 1, direction))
 
 class GridConstructorTests(unittest.TestCase):
     def test_center_elf_3x3_grid(self):
@@ -199,7 +266,17 @@ def part1(fname: str):
     g = Grid(sections[0])
     g.print()
     
-    positions = list(g.elf_positions())
+    directions = [NORTH, SOUTH, WEST, EAST]
+    for i, j in g.elf_positions():
+        if not g.crowded(i, j):
+            print(f'{{i, j) => stays put')
+            continue
+
+        for dir in directions:
+            if g.can_move(i, j, dir):
+                print(f'{(i, j)} => move {dir}')
+                break
+        
     
 
 def part2(fname: str):
