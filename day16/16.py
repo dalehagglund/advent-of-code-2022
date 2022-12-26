@@ -133,27 +133,54 @@ class State:
     ttl: int
     loc: Valve
     open: set[Valve] = field(default_factory=set)
+    released_so_far: int = 0
     
     def next_states(self):
+        newttl = self.ttl - 1
+        released = self.released_so_far + self.flow_rate()
         if self.loc not in self.open and self.loc.flow() > 0:
-            yield State(self.ttl - 1, self.loc, self.open | {self.loc})
+            yield State(
+                newttl, self.loc, self.open | {self.loc}, released
+            )
         for v in self.loc.neighbours():
-            yield State(self.ttl - 1, v, self.open)
+            yield State(
+                newttl, v, self.open, released
+            )
     
-    def total_flow(self):
+    def flow_rate(self):
         return sum(v.flow() for v in self.open)
 
     def __hash__(self):
         return hash((
             self.ttl,
             self.loc,
+            self.released_so_far,
             *self.open
         ))
         
+def make_valves(descr: list[tuple[str, int]]) -> list[Valve]:
+    return [ Valve(name, flow) for name, flow in descr ]
+
+class TestStateFlow(unittest.TestCase):
+    def test_default_flow_so_far_is_zero(self):
+        v = Valve('v', 10)
+        s = State( ttl=1, loc=v, open=set() )
+        self.assertEqual(0, s.released_so_far)
+
+    def test_flow_rate(self):
+        v, w = make_valves(zip("vw", (0, 10)))
+        s = State(ttl=1, loc=v, open={w})
+        self.assertEqual(10, s.flow_rate())
+        
+    def test_next_states_increase_total_release(self):
+        v, w, x = make_valves(zip("vwx", (0, 10, 20)))
+        v.add_neighbour(w)
+        
+        s = State(ttl=1, loc=v, open={x})
+        for ns in s.next_states():
+            self.assertEqual(20, ns.released_so_far)
+        
 class NextStateTests(unittest.TestCase):
-    def make_valves(self, descr: list[tuple[str, int]]) -> list[Valve]:
-        return [ Valve(name, flow) for name, flow in descr ]
-            
     def test_doesnt_turn_on_valve_if_flow_is_zero(self):
         v = Valve('v', 0)
         state = State(0, loc=v, open=set())
@@ -176,7 +203,7 @@ class NextStateTests(unittest.TestCase):
         self.assertFalse(True)
 
     def test_follows_neighbours(self):
-        v, w, x = self.make_valves(zip("vwx", (0, 20, 30)))
+        v, w, x = make_valves(zip("vwx", (0, 20, 30)))
         v.add_neighbour(w)
         v.add_neighbour(x)
         
@@ -193,15 +220,32 @@ class NextStateTests(unittest.TestCase):
             {ns.loc for ns in successors}
         )
         self.assertTrue(all(ns.ttl == 0 for ns in successors))
-
+        
 def search(valves, start, ttl):
 
     queue: list[State] = []
+    best_release = float('-inf')
+    
+    def estimated_release(s: State) -> int:
+        return (
+            s.released_so_far +
+            s.total_flow() * s.ttl
+        )
     
     queue.append( State(ttl, start, set()) )
     while queue:
         state = queue.pop(0)
-
+        if state.ttl == 0:
+            released = state.released_so_far
+            if  released > best_release:
+                best_release = released
+            continue
+        for succ in state.next_states():
+            queue.append( succ )
+        # sorting is O(n log n) so this loop could be O(n^2) ???
+        queue.sort(key=estimated_release, reverse=True)
+        
+        
 def read_valves(lines: list[str]) -> dict[str, Valve]:
     s = iter(lines)
     s = map(partial(re.sub, "[=;,]", " "), s)
