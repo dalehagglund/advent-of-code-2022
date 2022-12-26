@@ -17,6 +17,7 @@ import abc
 from functools import reduce, cmp_to_key
 import operator
 import collections
+import unittest
 
 def star(f):
     return lambda t: f(*t)
@@ -95,21 +96,79 @@ def prod(items): reduce(operator.mul, items, 1)
 def mapinner(f, items):
     for item in items:
         yield list(map(f, item))
-        
+
 class Valve:
     def __init__(self, name, flow):
         self._name = name
         self._flow = flow
         self._neighbours = set()
 
-    def set_flow(self, flow):
-        self._flow = flow
-    def add_neighbour(self, v: 'Valve'):
+    def add_neighbour(self, v: 'Valve') -> None:
         self._neighbours.add(v)
     
-    def name(self): return self._name
-    def flow(self): return self._flow
+    def name(self) -> str: return self._name
+    def flow(self) -> int: return self._flow
     def neighbours(self): yield from self._neighbours
+
+class ValveTests(unittest.TestCase):
+    def test_basic_construction(self):
+        v = Valve('v', 15)
+        self.assertEqual('v', v.name())
+        self.assertEqual(15, v.flow())
+        self.assertEqual(0, len(list(v.neighbours())))
+    def test_add_neighbours(self):
+        v = Valve('v', 15)
+        n1 = Valve('n1', 10)
+        n2 = Valve('n2', 20)
+        v.add_neighbour(n1)
+        v.add_neighbour(n2)
+        
+        neighbours = set(v.neighbours())
+        self.assertEqual(2, len(neighbours))
+        self.assertTrue(n1 in neighbours)
+        self.assertTrue(n2 in neighbours)
+    
+@dataclass(frozen=True)        
+class State:
+    tick: int
+    loc: Valve
+    open: set[Valve] = field(default_factory=set)
+    
+    def next_states(self):
+        if self.loc not in self.open and self.loc.flow() > 0:
+            yield State(self.tick + 1, self.loc, self.open | {self.loc})
+        for v in self.loc.neighbours():
+            yield State(self.tick + 1, v, self.open)
+    
+    def total_flow(self):
+        return sum(v.flow() for v in self.open)
+
+    def __hash__(self):
+        return hash((
+            self.tick,
+            self.loc,
+            *self.open
+        ))
+        
+class NextStateTests(unittest.TestCase):
+    def test_doesnt_turn_on_valve_if_flow_is_zero(self):
+        v = Valve('v', 0)
+        state = State(0, loc=v, open=set())
+        successors = set(state.next_states())
+        self.assertEqual(0, len(successors))
+        
+    def test_turns_on_valve_if_flow_isnt_zero(self):
+        v = Valve('v', 10)
+        state = State(0, loc=v, open=set())
+        
+        successors = set(state.next_states())
+        self.assertEqual(1, len(successors))
+        
+        next_state = next(iter(successors))
+        self.assertEqual(1, next_state.tick)
+        self.assertTrue(next_state.loc in next_state.open)
+        self.assertEqual(1, len(next_state.open))
+        
 
 def part1(fname: str):
     with open(fname) as f:
@@ -139,7 +198,6 @@ def part1(fname: str):
             v.flow(),
             list(map(Valve.name, v.neighbours()))
         )
-        
         
 def part2(fname: str):
     with open(fname) as f:
