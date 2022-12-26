@@ -122,26 +122,15 @@ def snafu_to_int(digits: str) -> int:
 
 def int_to_snafu(n: int) -> str:
     
-    snafu_digits = dict(zip([0, 1, 2, 3, 4], "012=-"))
-    snafu_adjustments = dict(
-        zip([0, 1, 2, 3, 4], [0, 0, 0, 2, 1])
-    )
+    snafu_digit = dict(zip([0, 1, 2, 3, 4], "012=-"))
+    snafu_adjustment = dict(zip([0, 1, 2, 3, 4], [0, 0, 0, 1, 1]))
     
     digits = []
-    q =  n
+    q = n
     while True:
         q, r = divmod(q, 5)
-        if 0 <= r <= 2:
-            digits.append(chr(ord("0") + r))    
-        elif r == 3:
-            digits.append("=")
-            q += 1
-        elif r == 4:
-            digits.append("-")
-            q += 1
-        else:
-            assert False, "huh?"
-        
+        q += snafu_adjustment[r]
+        digits.append(snafu_digit[r])
         if q == 0:
             break
 
