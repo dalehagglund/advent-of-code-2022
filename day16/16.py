@@ -151,6 +151,9 @@ class State:
         ))
         
 class NextStateTests(unittest.TestCase):
+    def make_valves(self, descr: list[tuple[str, int]]) -> list[Valve]:
+        return [ Valve(name, flow) for name, flow in descr ]
+            
     def test_doesnt_turn_on_valve_if_flow_is_zero(self):
         v = Valve('v', 0)
         state = State(0, loc=v, open=set())
@@ -169,6 +172,28 @@ class NextStateTests(unittest.TestCase):
         self.assertTrue(next_state.loc in next_state.open)
         self.assertEqual(1, len(next_state.open))
         
+    def test_open_doesnt_shrink(self):
+            
+        self.assertFalse(True)
+
+    def test_follows_neighbours(self):
+        v, w, x = self.make_valves(zip("vwx", (0, 20, 30)))
+        v.add_neighbour(w)
+        v.add_neighbour(x)
+        
+        s = State(0, loc=v, open=set())
+        successors = set(s.next_states())
+        
+        self.assertEqual(2, len(successors))
+        self.assertEqual(
+            {"w", "x"},
+            { ns.loc.name() for ns in successors }
+        )
+        self.assertEqual(
+            {w, x},
+            {ns.loc for ns in successors}
+        )
+        self.assertTrue(all(ns.tick == 1 for ns in successors))
 
 def part1(fname: str):
     with open(fname) as f:
