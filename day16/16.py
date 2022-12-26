@@ -173,7 +173,6 @@ class NextStateTests(unittest.TestCase):
         self.assertEqual(1, len(next_state.open))
         
     def test_open_doesnt_shrink(self):
-            
         self.assertFalse(True)
 
     def test_follows_neighbours(self):
@@ -195,12 +194,8 @@ class NextStateTests(unittest.TestCase):
         )
         self.assertTrue(all(ns.tick == 1 for ns in successors))
 
-def part1(fname: str):
-    with open(fname) as f:
-        sections = read_sections(f)
-    print(f'*** part 1 ***')
-        
-    s = iter(sections[0])
+def read_valves(lines: list[str]) -> dict[str, Valve]:
+    s = iter(lines)
     s = map(partial(re.sub, "[=;,]", " "), s)
     s = map(partial(re.sub, "has flow", ""), s)
     s = map(partial(re.sub, "tunnels? leads? to valves?", ""), s)
@@ -209,20 +204,32 @@ def part1(fname: str):
     s = map(str.split, s)
     node_data = collect(list, s)
 
-    valves = dict()
-    for vname, flow, *_ in node_data:
-        valves[vname] = Valve(vname, int(flow))
+    valves = {
+        vname: Valve(vname, flow)
+        for vname, flow, *_
+        in node_data
+    }
     for vname, _, *neighbours in node_data:
         v = valves[vname]
         for n in neighbours:
             v.add_neighbour(valves[n])    
 
+    return valves
+
+def print_valves(valves: dict[str, Valve]):
     for v in valves.values():
-        print(
-            v.name(),
-            v.flow(),
-            list(map(Valve.name, v.neighbours()))
-        )
+        print(f'node: {v.name()} flow: {v.flow()}')
+        print(f'   neighbours: {" ".join(n.name() for n in v.neighbours())}')
+
+def part1(fname: str):
+    with open(fname) as f:
+        sections = read_sections(f)
+    print(f'*** part 1 ***')    
+
+    valves = read_valves(sections[0])
+
+    print_valves(valves)
+    start = valves['AA']
         
 def part2(fname: str):
     with open(fname) as f:
