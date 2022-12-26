@@ -130,22 +130,22 @@ class ValveTests(unittest.TestCase):
     
 @dataclass(frozen=True)        
 class State:
-    tick: int
+    ttl: int
     loc: Valve
     open: set[Valve] = field(default_factory=set)
     
     def next_states(self):
         if self.loc not in self.open and self.loc.flow() > 0:
-            yield State(self.tick + 1, self.loc, self.open | {self.loc})
+            yield State(self.ttl - 1, self.loc, self.open | {self.loc})
         for v in self.loc.neighbours():
-            yield State(self.tick + 1, v, self.open)
+            yield State(self.ttl - 1, v, self.open)
     
     def total_flow(self):
         return sum(v.flow() for v in self.open)
 
     def __hash__(self):
         return hash((
-            self.tick,
+            self.ttl,
             self.loc,
             *self.open
         ))
@@ -162,13 +162,13 @@ class NextStateTests(unittest.TestCase):
         
     def test_turns_on_valve_if_flow_isnt_zero(self):
         v = Valve('v', 10)
-        state = State(0, loc=v, open=set())
+        state = State(1, loc=v, open=set())
         
         successors = set(state.next_states())
         self.assertEqual(1, len(successors))
         
         next_state = next(iter(successors))
-        self.assertEqual(1, next_state.tick)
+        self.assertEqual(0, next_state.ttl)
         self.assertTrue(next_state.loc in next_state.open)
         self.assertEqual(1, len(next_state.open))
         
@@ -180,7 +180,7 @@ class NextStateTests(unittest.TestCase):
         v.add_neighbour(w)
         v.add_neighbour(x)
         
-        s = State(0, loc=v, open=set())
+        s = State(1, loc=v, open=set())
         successors = set(s.next_states())
         
         self.assertEqual(2, len(successors))
@@ -192,7 +192,15 @@ class NextStateTests(unittest.TestCase):
             {w, x},
             {ns.loc for ns in successors}
         )
-        self.assertTrue(all(ns.tick == 1 for ns in successors))
+        self.assertTrue(all(ns.ttl == 0 for ns in successors))
+
+def search(valves, start, ttl):
+
+    queue: list[State] = []
+    
+    queue.append( State(ttl, start, set()) )
+    while queue:
+        state = queue.pop(0)
 
 def read_valves(lines: list[str]) -> dict[str, Valve]:
     s = iter(lines)
