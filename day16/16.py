@@ -164,17 +164,11 @@ def next_states(state, max_possible_flow):
     
     if state.flow_rate() == max_possible_flow:
         # all valves are on, just sit here
-        yield make_state(
-            loc = state.loc,
-            open = state.open,
-            released_so_far = released
-        )
+        yield make_state(loc=state.loc, open=state.open)
         return
     
     if state.loc not in state.open and state.loc.flow() > 0:
-        yield State(
-            newttl, state.loc, state.open | {state.loc}, released
-        )
+        yield make_state(loc = state.loc, open = state.open | {state.loc})
     for v in state.loc.neighbours():
         # thoughts:
         # - maintain a consecurtive zero nodes history
@@ -184,9 +178,7 @@ def next_states(state, max_possible_flow):
         #    if v in state.zerohist: continue
         #    yield State(..., zerohist=state.zerohist | {v}
         #else:
-        yield State(
-            newttl, v, state.open, released
-        )
+        yield make_state(loc=v, open=state.open)
     
 class NextStateTests(unittest.TestCase):
     def test_doesnt_turn_on_valve_if_flow_is_zero(self):
@@ -210,6 +202,21 @@ class NextStateTests(unittest.TestCase):
     @unittest.skip("defer")
     def test_open_doesnt_shrink(self):
         self.assertFalse(True)
+        
+    def test_stay_put_if_max_flow_achieved(self):
+        v, w, x = make_valves(zip("vwx", (0, 20, 30)))
+        v.add_neighbour(w)
+        v.add_neighbour(x)
+        
+        s = State(ttl=1, loc=v, open={w, x})
+        successors = set(next_states(s, 20 + 30))
+        
+        self.assertEqual(1, len(successors))
+        ns = next(iter(successors))
+        
+        self.assertEqual(s.ttl - 1, ns.ttl)
+        self.assertEqual(s.loc, ns.loc)
+        self.assertEqual(s.open, ns.open)
 
     def test_follows_neighbours(self):
         v, w, x = make_valves(zip("vwx", (0, 20, 30)))
