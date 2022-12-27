@@ -141,19 +141,6 @@ class State:
     open: set[Valve] = field(default_factory=set)
     released_so_far: int = 0
     
-    def next_states(self):
-        newttl = self.ttl - 1
-        released = self.released_so_far + self.flow_rate()
-        
-        if self.loc not in self.open and self.loc.flow() > 0:
-            yield State(
-                newttl, self.loc, self.open | {self.loc}, released
-            )
-        for v in self.loc.neighbours():
-            yield State(
-                newttl, v, self.open, released
-            )
-    
     def flow_rate(self):
         return sum(v.flow() for v in self.open)
 
@@ -201,6 +188,47 @@ def next_states(state, max_possible_flow):
             newttl, v, state.open, released
         )
     
+class NextStateTests(unittest.TestCase):
+    def test_doesnt_turn_on_valve_if_flow_is_zero(self):
+        v = Valve('v', 0)
+        state = State(0, loc=v, open=set())
+        successors = set(next_states(state, float('+inf')))
+        self.assertEqual(0, len(successors))
+        
+    def test_turns_on_valve_if_flow_isnt_zero(self):
+        v = Valve('v', 10)
+        state = State(1, loc=v, open=set())
+        
+        successors = set(next_states(state, float('+inf')))
+        self.assertEqual(1, len(successors))
+        
+        next_state = next(iter(successors))
+        self.assertEqual(0, next_state.ttl)
+        self.assertTrue(next_state.loc in next_state.open)
+        self.assertEqual(1, len(next_state.open))
+
+    @unittest.skip("defer")
+    def test_open_doesnt_shrink(self):
+        self.assertFalse(True)
+
+    def test_follows_neighbours(self):
+        v, w, x = make_valves(zip("vwx", (0, 20, 30)))
+        v.add_neighbour(w)
+        v.add_neighbour(x)
+        
+        s = State(1, loc=v, open=set())
+        successors = set(next_states(s, float('+inf')))
+        
+        self.assertEqual(2, len(successors))
+        self.assertEqual(
+            {"w", "x"},
+            { ns.loc.name() for ns in successors }
+        )
+        self.assertEqual(
+            {w, x},
+            {ns.loc for ns in successors}
+        )
+        self.assertTrue(all(ns.ttl == 0 for ns in successors))
  
 def make_valves(descr: list[tuple[str, int]]) -> list[Valve]:
     return [ Valve(name, flow) for name, flow in descr ]
@@ -221,50 +249,9 @@ class TestStateFlow(unittest.TestCase):
         v.add_neighbour(w)
         
         s = State(ttl=1, loc=v, open={x})
-        for ns in s.next_states():
+        for ns in next_states(s, float('+inf')):
             self.assertEqual(20, ns.released_so_far)
         
-class NextStateTests(unittest.TestCase):
-    def test_doesnt_turn_on_valve_if_flow_is_zero(self):
-        v = Valve('v', 0)
-        state = State(0, loc=v, open=set())
-        successors = set(state.next_states())
-        self.assertEqual(0, len(successors))
-        
-    def test_turns_on_valve_if_flow_isnt_zero(self):
-        v = Valve('v', 10)
-        state = State(1, loc=v, open=set())
-        
-        successors = set(state.next_states())
-        self.assertEqual(1, len(successors))
-        
-        next_state = next(iter(successors))
-        self.assertEqual(0, next_state.ttl)
-        self.assertTrue(next_state.loc in next_state.open)
-        self.assertEqual(1, len(next_state.open))
-
-    @unittest.skip("defer")
-    def test_open_doesnt_shrink(self):
-        self.assertFalse(True)
-
-    def test_follows_neighbours(self):
-        v, w, x = make_valves(zip("vwx", (0, 20, 30)))
-        v.add_neighbour(w)
-        v.add_neighbour(x)
-        
-        s = State(1, loc=v, open=set())
-        successors = set(s.next_states())
-        
-        self.assertEqual(2, len(successors))
-        self.assertEqual(
-            {"w", "x"},
-            { ns.loc.name() for ns in successors }
-        )
-        self.assertEqual(
-            {w, x},
-            {ns.loc for ns in successors}
-        )
-        self.assertTrue(all(ns.ttl == 0 for ns in successors))
 
 class PrioQueue:
     def __init__(self, key=None):
