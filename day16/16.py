@@ -144,6 +144,7 @@ class State:
     def next_states(self):
         newttl = self.ttl - 1
         released = self.released_so_far + self.flow_rate()
+        
         if self.loc not in self.open and self.loc.flow() > 0:
             yield State(
                 newttl, self.loc, self.open | {self.loc}, released
@@ -163,6 +164,43 @@ class State:
             self.released_so_far,
             *self.open
         ))
+        
+def next_states(state, max_possible_flow):
+    newttl = state.ttl - 1
+    released = state.released_so_far + state.flow_rate()
+    
+    make_state = partial(
+        State, 
+        ttl = state.ttl - 1,
+        released_so_far = state.released_so_far + state.flow_rate()
+    )
+    
+    if state.flow_rate() == max_possible_flow:
+        # all valves are on, just sit here
+        yield make_state(
+            loc = state.loc,
+            open = state.open,
+            released_so_far = released
+        )
+        return
+    
+    if state.loc not in state.open and state.loc.flow() > 0:
+        yield State(
+            newttl, state.loc, state.open | {state.loc}, released
+        )
+    for v in state.loc.neighbours():
+        # thoughts:
+        # - maintain a consecurtive zero nodes history
+        # - reset this to empty when a new states flow increases
+        # - do not re-visit a zero flow neighbour that's in the current history
+        #if v.flow() == 0:
+        #    if v in state.zerohist: continue
+        #    yield State(..., zerohist=state.zerohist | {v}
+        #else:
+        yield State(
+            newttl, v, state.open, released
+        )
+    
  
 def make_valves(descr: list[tuple[str, int]]) -> list[Valve]:
     return [ Valve(name, flow) for name, flow in descr ]
@@ -293,19 +331,28 @@ def search(valves, start, ttl, verbose=False):
     print = builtins.print if verbose else lambda *_: 1
     print(f'search: {start = !s} {ttl = }')
     
-    queue: PrioQueue = PrioQueue(key=lambda s: -estimated_release(s))
+    def priority_heuristic(s: State):
+        return -estimated_release(s)
+    
+    queue: PrioQueue = PrioQueue(key=priority_heuristic)
     
     counter = itertools.count(1)
-    pruned = 0
-    appended = 0
+    total_pruned = pruned = 0
+    total_appended = appended = 1
     
     queue.insert( State(ttl, start, set()) )
     while queue:
         n = next(counter)
         
         if n % 1000 == 0:
+            total_appended += appended
+            total_pruned += pruned
             builtins.print(
-                f'{n}: {len(queue) = } {pruned = } {appended = } {best_release = }'
+                f'{n}:',
+                'qlen', len(queue),
+                'pruned', pruned,
+                'appended', appended,
+                'best', best_release
             )
             appended = pruned = 0
         if verbose:
@@ -322,13 +369,12 @@ def search(valves, start, ttl, verbose=False):
             released = state.released_so_far
             if  released > best_release:
                 best_release = released
-            continue
         elif best_possible_release(state) < best_release:
             pruned += 1
             if verbose: print(f"   pruning: can't reach current best_release")
         else:
             print(f'   expanding')
-            for succ in state.next_states():
+            for succ in next_states(state, max_flow_rate):
                 if verbose: print(f'      {succ = }')
                 queue.insert( succ )
                 appended += 1            
