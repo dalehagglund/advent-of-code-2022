@@ -232,6 +232,7 @@ def search(valves, start, ttl, verbose=False):
     queue: list[State] = []
     best_release = float('-inf')
     max_flow_rate = sum(v.flow() for v in valves.values())
+
     
     def estimated_release(s: State) -> int:
         return (
@@ -249,14 +250,18 @@ def search(valves, start, ttl, verbose=False):
     print(f'search: {start = !s} {ttl = }')
     
     counter = itertools.count(1)
-    
+    pruned = 0
+    appended = 0
     
     queue.append( State(ttl, start, set()) )
     while queue:
         n = next(counter)
         
         if n % 1000 == 0:
-            builtins.print(f'{n}: {len(queue) = } {best_release = }')
+            builtins.print(
+                f'{n}: {len(queue) = } {pruned = } {appended = } {best_release = }'
+            )
+            appended = pruned = 0
         if verbose:
             print('queue = [')
             for item in queue:
@@ -264,23 +269,26 @@ def search(valves, start, ttl, verbose=False):
             print(']')
             
         state = queue.pop(0)
-        print(f'examining {state = }')
+        if verbose: print(f'examining {state = }')
         
         if state.ttl == 0:
-            print(f'   ttl == 0 {best_release = }')
+            if verbose: print(f'   ttl == 0 {best_release = }')
             released = state.released_so_far
             if  released > best_release:
                 best_release = released
             continue
         elif best_possible_release(state) < best_release:
-            print(f"pruning: can't reach current best_release")
+            pruned += 1
+            if verbose: print(f"   pruning: can't reach current best_release")
         else:
             print(f'   expanding')
             for succ in state.next_states():
-                print(f'      {succ = }')
+                if verbose: print(f'      {succ = }')
                 queue.append( succ )
+                appended += 1
             # sorting is O(n log n) so this loop could be O(n^2) ???
             queue.sort(key=estimated_release, reverse=True)
+            
         
     print(f'no more states: {best_release = }')
         
