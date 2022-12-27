@@ -229,20 +229,18 @@ class NextStateTests(unittest.TestCase):
         self.assertTrue(all(ns.ttl == 0 for ns in successors))
 
 class PrioQueue:
-    def __init__(self):
+    def __init__(self, key=None):
+        self._key = key if key is not None else lambda x: x
         self._pq = []
         self._counter = itertools.count()
-        
     def insert(self, item):
         heapq.heappush(self._pq, self._to_entry(item))
-        
     def pop(self):
         return self._to_item(heapq.heappop(self._pq))
-
     def _to_entry(self, item):
-        return (item, next(self._counter))
+        return (self._key(item), next(self._counter), item)
     def _to_item(self, entry):
-        return entry[0]
+        return entry[-1]
     def __len__(self):
         return len(self._pq)
     
@@ -266,6 +264,12 @@ class PrioQueueTests(unittest.TestCase):
         pq.insert(2)
         pq.insert(1)
         self.assertEqual(1, pq.pop())
+    def test_use_keyfunc_to_invert_heap_order(self):
+        pq = PrioQueue(key=lambda x: -x)
+        pq.insert(3)
+        pq.insert(2)
+        pq.insert(1)
+        self.assertEqual(3, pq.pop())
 
 def search(valves, start, ttl, verbose=False):
     import builtins
