@@ -273,7 +273,7 @@ class PrioQueueTests(unittest.TestCase):
 
 def search(valves, start, ttl, verbose=False):
     import builtins
-    queue: list[State] = []
+    
     best_release = float('-inf')
     max_flow_rate = sum(v.flow() for v in valves.values())
 
@@ -293,11 +293,13 @@ def search(valves, start, ttl, verbose=False):
     print = builtins.print if verbose else lambda *_: 1
     print(f'search: {start = !s} {ttl = }')
     
+    queue: PrioQueue = PrioQueue(key=lambda s: -estimated_release(s))
+    
     counter = itertools.count(1)
     pruned = 0
     appended = 0
     
-    queue.append( State(ttl, start, set()) )
+    queue.insert( State(ttl, start, set()) )
     while queue:
         n = next(counter)
         
@@ -312,7 +314,7 @@ def search(valves, start, ttl, verbose=False):
                 print(f'   {item}')
             print(']')
             
-        state = queue.pop(0)
+        state = queue.pop()
         if verbose: print(f'examining {state = }')
         
         if state.ttl == 0:
@@ -328,11 +330,8 @@ def search(valves, start, ttl, verbose=False):
             print(f'   expanding')
             for succ in state.next_states():
                 if verbose: print(f'      {succ = }')
-                queue.append( succ )
-                appended += 1
-            # sorting is O(n log n) so this loop could be O(n^2) ???
-            queue.sort(key=estimated_release, reverse=True)
-            
+                queue.insert( succ )
+                appended += 1            
         
     print(f'no more states: {best_release = }')
         
