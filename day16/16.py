@@ -140,6 +140,7 @@ class State:
     loc: Valve
     open: set[Valve] = field(default_factory=set)
     released_so_far: int = 0
+    non_progress: set[Valve] = field(default_factory=set)
     
     def flow_rate(self):
         return sum(v.flow() for v in self.open)
@@ -149,7 +150,8 @@ class State:
             self.ttl,
             self.loc,
             self.released_so_far,
-            *self.open
+            *self.open,
+            *self.non_progress,
         ))
         
 def next_states(state, max_possible_flow):
@@ -164,11 +166,21 @@ def next_states(state, max_possible_flow):
     
     if state.flow_rate() == max_possible_flow:
         # all valves are on, just sit here
-        yield make_state(loc=state.loc, open=state.open)
+        yield make_state(
+            loc=state.loc,
+            open=state.open,
+            non_progress=state.non_progress
+        )
         return
     
     if state.loc not in state.open and state.loc.flow() > 0:
-        yield make_state(loc = state.loc, open = state.open | {state.loc})
+        # the total flow rate only increases here, so reset the nonprogress set
+        yield make_state(
+            loc = state.loc, 
+            open = state.open | {state.loc},
+            non_progress = set()
+        )
+
     for v in state.loc.neighbours():
         # thoughts:
         # - maintain a consecurtive zero nodes history
@@ -178,7 +190,12 @@ def next_states(state, max_possible_flow):
         #    if v in state.zerohist: continue
         #    yield State(..., zerohist=state.zerohist | {v}
         #else:
-        yield make_state(loc=v, open=state.open)
+        if v in state.non_progress: continue
+        yield make_state(
+            loc = v,
+            open = state.open,
+            non_progress = state.non_progress | {state.loc}
+        )
     
 class NextStateTests(unittest.TestCase):
     def test_doesnt_turn_on_valve_if_flow_is_zero(self):
@@ -236,6 +253,24 @@ class NextStateTests(unittest.TestCase):
             {ns.loc for ns in successors}
         )
         self.assertTrue(all(ns.ttl == 0 for ns in successors))
+        
+    def test_detect_cycle_with_no_progress(self):
+        v, w = make_valves(zip("vw", (0, 0)))
+        v.add_neighbour(w)
+        w.add_neighbour(v)
+        
+        s1 = State(10, loc=v, open=set())
+        s2 = exactly(1, next_states(s1, float('+inf')))
+        
+        self.assertEqual(0, len(set(next_states(s2, float('+inf')))))
+ 
+def exactly(n, items):
+    pairs = zip(range(n), items, strict=True)
+    if n == 1:
+        return next(pairs)[1]
+    
+    return list(next(pairs)[1] for _ in range(n))
+ 
  
 def make_valves(descr: list[tuple[str, int]]) -> list[Valve]:
     return [ Valve(name, flow) for name, flow in descr ]
