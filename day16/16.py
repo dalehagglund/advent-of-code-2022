@@ -18,6 +18,7 @@ from functools import reduce, cmp_to_key
 import operator
 import collections
 import unittest
+import heapq
 
 def star(f):
     return lambda t: f(*t)
@@ -162,7 +163,7 @@ class State:
             self.released_so_far,
             *self.open
         ))
-        
+ 
 def make_valves(descr: list[tuple[str, int]]) -> list[Valve]:
     return [ Valve(name, flow) for name, flow in descr ]
 
@@ -226,7 +227,46 @@ class NextStateTests(unittest.TestCase):
             {ns.loc for ns in successors}
         )
         self.assertTrue(all(ns.ttl == 0 for ns in successors))
+
+class PrioQueue:
+    def __init__(self):
+        self._pq = []
+        self._counter = itertools.count()
         
+    def insert(self, item):
+        heapq.heappush(self._pq, self._to_entry(item))
+        
+    def pop(self):
+        return self._to_item(heapq.heappop(self._pq))
+
+    def _to_entry(self, item):
+        return (item, next(self._counter))
+    def _to_item(self, entry):
+        return entry[0]
+    def __len__(self):
+        return len(self._pq)
+    
+class PrioQueueTests(unittest.TestCase):
+    def test_constructor(self):
+        pq = PrioQueue()
+    def test_len_empty_qp_is_zero(self):
+        pq = PrioQueue()
+        self.assertEqual(0, len(pq))
+    def test_len_is_one_after_insert(self):
+        pq = PrioQueue()
+        pq.insert(3)
+        self.assertEqual(1, len(pq))
+    def test_pop_returns_last_item(self):
+        pq = PrioQueue()
+        pq.insert(1)
+        self.assertEqual(1, pq.pop())
+    def test_min_out_first(self):
+        pq = PrioQueue()
+        pq.insert(3)
+        pq.insert(2)
+        pq.insert(1)
+        self.assertEqual(1, pq.pop())
+
 def search(valves, start, ttl, verbose=False):
     import builtins
     queue: list[State] = []
