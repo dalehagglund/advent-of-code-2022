@@ -109,6 +109,11 @@ class Valve:
     def name(self) -> str: return self._name
     def flow(self) -> int: return self._flow
     def neighbours(self): yield from self._neighbours
+    
+    def __str__(self):
+        return f'{self._name}/{self._flow}'
+    def __repr__(self):
+        return str(self)
 
 class ValveTests(unittest.TestCase):
     def test_basic_construction(self):
@@ -198,7 +203,8 @@ class NextStateTests(unittest.TestCase):
         self.assertEqual(0, next_state.ttl)
         self.assertTrue(next_state.loc in next_state.open)
         self.assertEqual(1, len(next_state.open))
-        
+
+    @unittest.skip("defer")
     def test_open_doesnt_shrink(self):
         self.assertFalse(True)
 
@@ -221,30 +227,62 @@ class NextStateTests(unittest.TestCase):
         )
         self.assertTrue(all(ns.ttl == 0 for ns in successors))
         
-def search(valves, start, ttl):
-
+def search(valves, start, ttl, verbose=False):
+    import builtins
     queue: list[State] = []
     best_release = float('-inf')
+    max_flow_rate = sum(v.flow() for v in valves.values())
     
     def estimated_release(s: State) -> int:
         return (
             s.released_so_far +
-            s.total_flow() * s.ttl
+            s.flow_rate() * s.ttl
         )
+        
+    def best_possible_release(s: State) -> int:
+        return (
+            s.released_so_far +
+            max_flow_rate * s.ttl
+        )
+    
+    print = builtins.print if verbose else lambda *_: 1
+    print(f'search: {start = !s} {ttl = }')
+    
+    counter = itertools.count(1)
+    
     
     queue.append( State(ttl, start, set()) )
     while queue:
+        n = next(counter)
+        
+        if n % 1000 == 0:
+            builtins.print(f'{n}: {len(queue) = } {best_release = }')
+        if verbose:
+            print('queue = [')
+            for item in queue:
+                print(f'   {item}')
+            print(']')
+            
         state = queue.pop(0)
+        print(f'examining {state = }')
+        
         if state.ttl == 0:
+            print(f'   ttl == 0 {best_release = }')
             released = state.released_so_far
             if  released > best_release:
                 best_release = released
             continue
-        for succ in state.next_states():
-            queue.append( succ )
-        # sorting is O(n log n) so this loop could be O(n^2) ???
-        queue.sort(key=estimated_release, reverse=True)
+        elif best_possible_release(state) < best_release:
+            print(f"pruning: can't reach current best_release")
+        else:
+            print(f'   expanding')
+            for succ in state.next_states():
+                print(f'      {succ = }')
+                queue.append( succ )
+            # sorting is O(n log n) so this loop could be O(n^2) ???
+            queue.sort(key=estimated_release, reverse=True)
         
+    print(f'no more states: {best_release = }')
         
 def read_valves(lines: list[str]) -> dict[str, Valve]:
     s = iter(lines)
@@ -257,7 +295,7 @@ def read_valves(lines: list[str]) -> dict[str, Valve]:
     node_data = collect(list, s)
 
     valves = {
-        vname: Valve(vname, flow)
+        vname: Valve(vname, int(flow))
         for vname, flow, *_
         in node_data
     }
@@ -282,6 +320,8 @@ def part1(fname: str):
 
     print_valves(valves)
     start = valves['AA']
+    
+    search(valves, start, 30, verbose=False)
         
 def part2(fname: str):
     with open(fname) as f:
