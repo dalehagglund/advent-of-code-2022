@@ -155,9 +155,6 @@ class State:
         ))
         
 def next_states(state, max_possible_flow):
-    newttl = state.ttl - 1
-    released = state.released_so_far + state.flow_rate()
-    
     make_state = partial(
         State, 
         ttl = state.ttl - 1,
@@ -182,14 +179,9 @@ def next_states(state, max_possible_flow):
         )
 
     for v in state.loc.neighbours():
-        # thoughts:
-        # - maintain a consecurtive zero nodes history
-        # - reset this to empty when a new states flow increases
-        # - do not re-visit a zero flow neighbour that's in the current history
-        #if v.flow() == 0:
-        #    if v in state.zerohist: continue
-        #    yield State(..., zerohist=state.zerohist | {v}
-        #else:
+        # only expand v if it doesn't form a no-progress cycle.
+        # note that none of the states generated here increase the
+        # flow rate
         if v in state.non_progress: continue
         yield make_state(
             loc = v,
@@ -270,8 +262,7 @@ def exactly(n, items):
         return next(pairs)[1]
     
     return list(next(pairs)[1] for _ in range(n))
- 
- 
+
 def make_valves(descr: list[tuple[str, int]]) -> list[Valve]:
     return [ Valve(name, flow) for name, flow in descr ]
 
@@ -293,7 +284,6 @@ class TestStateFlow(unittest.TestCase):
         s = State(ttl=1, loc=v, open={x})
         for ns in next_states(s, float('+inf')):
             self.assertEqual(20, ns.released_so_far)
-        
 
 class PrioQueue:
     def __init__(self, key=None):
@@ -344,7 +334,6 @@ def search(valves, start, ttl, verbose=False):
     best_release = float('-inf')
     max_flow_rate = sum(v.flow() for v in valves.values())
 
-    
     def estimated_release(s: State) -> int:
         return (
             s.released_so_far +
