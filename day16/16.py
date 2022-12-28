@@ -14,11 +14,13 @@ from itertools import (
     zip_longest
 )
 import abc
+import functools
 from functools import reduce, cmp_to_key
 import operator
 import collections
 import unittest
 import heapq
+import time
 
 def star(f):
     return lambda t: f(*t)
@@ -142,6 +144,7 @@ class State:
     released_so_far: int = 0
     non_progress: set[Valve] = field(default_factory=set)
     
+    @functools.cache
     def flow_rate(self):
         return sum(v.flow() for v in self.open)
 
@@ -358,14 +361,20 @@ def search(valves, start, ttl, verbose=False):
     total_pruned = pruned = 0
     total_appended = appended = 1
     
+    elapsed_start = lap_start = time.perf_counter()
+    
     queue.insert( State(ttl, start, set()) )
     while queue:
         n = next(counter)
         
         if n % 1000 == 0:
+            t = time.perf_counter()
             total_appended += appended
             total_pruned += pruned
+            
             builtins.print(
+                f'elapsed {t - elapsed_start:6.3f}',
+                f'lap {t  - lap_start:5.3f}',
                 f'{n}:',
                 'qlen', len(queue),
                 'pruned', pruned,
@@ -373,6 +382,7 @@ def search(valves, start, ttl, verbose=False):
                 'best', best_release
             )
             appended = pruned = 0
+            lap_start = time.perf_counter()
         if verbose:
             print('queue = [')
             for item in queue:
@@ -397,7 +407,7 @@ def search(valves, start, ttl, verbose=False):
                 queue.insert( succ )
                 appended += 1            
         
-    print(f'no more states: {best_release = }')
+    builtins.print(f'no more states: {best_release = } {total_appended = } {total_pruned = }    ')
         
 def read_valves(lines: list[str]) -> dict[str, Valve]:
     s = iter(lines)
