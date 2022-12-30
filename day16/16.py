@@ -135,7 +135,13 @@ class ValveTests(unittest.TestCase):
         self.assertEqual(2, len(neighbours))
         self.assertTrue(n1 in neighbours)
         self.assertTrue(n2 in neighbours)
-    
+
+@dataclass(frozen=True)
+class Player:
+    name: str
+    loc: Valve
+    non_progress: set[Valve] = field(default_factory=set)
+        
 @dataclass(frozen=True)        
 class State:
     ttl: int
@@ -143,11 +149,8 @@ class State:
     open: set[Valve] = field(default_factory=set)
     released_so_far: int = 0
     non_progress: set[Valve] = field(default_factory=set)
+    total_flow: int = 0
     
-    @functools.cache
-    def flow_rate(self):
-        return sum(v.flow() for v in self.open)
-
     def __hash__(self):
         return hash((
             self.ttl,
@@ -156,15 +159,16 @@ class State:
             *self.open,
             *self.non_progress,
         ))
-        
+
 def next_states(state, max_possible_flow):
     make_state = partial(
         State, 
         ttl = state.ttl - 1,
-        released_so_far = state.released_so_far + state.flow_rate()
+        released_so_far = state.released_so_far + state.total_flow,
+        total_flow = state.total_flow
     )
     
-    if state.flow_rate() == max_possible_flow:
+    if state.total_flow == max_possible_flow:
         # all valves are on, just sit here
         yield make_state(
             loc=state.loc,
@@ -178,7 +182,8 @@ def next_states(state, max_possible_flow):
         yield make_state(
             loc = state.loc, 
             open = state.open | {state.loc},
-            non_progress = set()
+            non_progress = set(),
+            total_flow = state.total_flow + state.loc.flow()
         )
 
     for v in state.loc.neighbours():
@@ -274,11 +279,6 @@ class TestStateFlow(unittest.TestCase):
         v = Valve('v', 10)
         s = State( ttl=1, loc=v, open=set() )
         self.assertEqual(0, s.released_so_far)
-
-    def test_flow_rate(self):
-        v, w = make_valves(zip("vw", (0, 10)))
-        s = State(ttl=1, loc=v, open={w})
-        self.assertEqual(10, s.flow_rate())
         
     def test_next_states_increase_total_release(self):
         v, w, x = make_valves(zip("vwx", (0, 10, 20)))
@@ -340,7 +340,7 @@ def search(valves, start, ttl, verbose=False):
     def estimated_release(s: State) -> int:
         return (
             s.released_so_far +
-            s.flow_rate() * s.ttl
+            s.total_flow * s.ttl
         )
         
     def best_possible_release(s: State) -> int:
