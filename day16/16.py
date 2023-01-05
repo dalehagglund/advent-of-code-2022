@@ -167,30 +167,28 @@ class State:
         )
 
     def wait_here(self):
-        return dataclasses.replace(
-            self,
-            ttl = self.ttl - 1,
-            released_so_far = self.released_so_far + self.total_flow
-        )
+        return self._tick()
 
     def open_valve(self, v: Valve) -> 'State':
-        return dataclasses.replace(
-            self,
-            ttl = self.ttl - 1,
-            released_so_far = self.released_so_far + self.total_flow,
+        return self._tick(
             open = self.open | { v },
             total_flow = self.total_flow + v.flow(),
             non_progress = set(),
         )
         
     def move_to(self, v: Valve) -> 'State':
-        return dataclasses.replace(
-            self,
-            ttl = self.ttl - 1,
+        return self._tick(
             loc = v,
-            released_so_far = self.released_so_far + self.total_flow,
             open = self.open,
             non_progress = self.non_progress | { self.loc }
+        )
+        
+    def _tick(self, **kwargs) -> 'State':
+        return dataclasses.replace(
+            self,
+            ttl = self.ttl -1,
+            released_so_far = self.released_so_far + self.total_flow,
+            **kwargs
         )
 
     def __hash__(self):
