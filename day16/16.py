@@ -1,5 +1,6 @@
 import sys
 import typing as ty
+import dataclasses
 from dataclasses import dataclass, field
 from enum import Enum
 import functools
@@ -137,8 +138,7 @@ class ValveTests(unittest.TestCase):
         self.assertTrue(n2 in neighbours)
 
 @dataclass(frozen=True)
-class Player:
-    name: str
+class Walker:
     loc: Valve
     non_progress: set[Valve] = field(default_factory=set)
         
@@ -146,6 +146,7 @@ class Player:
 class State:
     ttl: int
     loc: Valve
+    _: dataclasses.KW_ONLY
     open: set[Valve] = field(default_factory=set)
     released_so_far: int = 0
     non_progress: set[Valve] = field(default_factory=set)
@@ -225,11 +226,8 @@ class NextStateTests(unittest.TestCase):
         v.add_neighbour(w)
         v.add_neighbour(x)
         
-        s = State(ttl=1, loc=v, open={w, x})
-        successors = set(next_states(s, 20 + 30))
-        
-        self.assertEqual(1, len(successors))
-        ns = next(iter(successors))
+        s = State(ttl=1, loc=v, open={w, x}, total_flow=50)
+        ns = exactly(1, next_states(s, 20 + 30))
         
         self.assertEqual(s.ttl - 1, ns.ttl)
         self.assertEqual(s.loc, ns.loc)
@@ -265,11 +263,40 @@ class NextStateTests(unittest.TestCase):
         self.assertEqual(0, len(set(next_states(s2, float('+inf')))))
  
 def exactly(n, items):
-    pairs = zip(range(n), items, strict=True)
-    if n == 1:
-        return next(pairs)[1]
+    items = iter(items)
+    sentinel = object()
     
-    return list(next(pairs)[1] for _ in range(n))
+    results = [ next(items, sentinel) for _ in range(n) ]
+    if results[-1] is sentinel:
+        raise ValueError()
+    
+    if next(items, sentinel) != sentinel:
+        raise ValueError()
+        
+    if n == 1:
+        return results[0]
+    else:
+        return results
+    
+class ExactlyTests(unittest.TestCase):
+    def test_passing_cases(self):
+        cases = [
+            ( 1, 1, [1] ),
+            ( [1, 2], 2, [1, 2] ),
+        ]
+        for expected, n, items in cases:
+            with self.subTest(n=n, items=items, expected=expected):
+                v = exactly(n, items)
+                self.assertEqual(expected, v)
+    def test_failing_cases(self):
+        cases = [
+            ( 1, [] ),
+            ( 1, [1, 2] ),
+        ]
+        for n, items in cases:
+            with self.subTest(n=n, items=items):
+                with self.assertRaises(ValueError):
+                    exactly(n, items)
 
 def make_valves(descr: list[tuple[str, int]]) -> list[Valve]:
     return [ Valve(name, flow) for name, flow in descr ]
@@ -284,7 +311,7 @@ class TestStateFlow(unittest.TestCase):
         v, w, x = make_valves(zip("vwx", (0, 10, 20)))
         v.add_neighbour(w)
         
-        s = State(ttl=1, loc=v, open={x})
+        s = State(ttl=1, loc=v, open={x}, total_flow=20)
         for ns in next_states(s, float('+inf')):
             self.assertEqual(20, ns.released_so_far)
 
@@ -363,7 +390,7 @@ def search(valves, start, ttl, verbose=False):
     
     elapsed_start = lap_start = time.perf_counter()
     
-    queue.insert( State(ttl, start, set()) )
+    queue.insert( State(ttl, start, open=set()) )
     while queue:
         n = next(counter)
         
