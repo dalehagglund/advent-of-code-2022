@@ -136,12 +136,15 @@ class ValveTests(unittest.TestCase):
         self.assertEqual(2, len(neighbours))
         self.assertTrue(n1 in neighbours)
         self.assertTrue(n2 in neighbours)
-
+        
 @dataclass(frozen=True)
 class Walker:
     loc: Valve
     non_progress: set[Valve] = field(default_factory=set)
-        
+    
+    def __hash__(self):
+        return hash(self.loc, *self.non_progress)
+    
 @dataclass(frozen=True)        
 class State:
     ttl: int
@@ -152,6 +155,44 @@ class State:
     non_progress: set[Valve] = field(default_factory=set)
     total_flow: int = 0
     
+    @classmethod
+    def new(cls, ttl:int , loc: Valve, open=None) -> 'State':
+        if open is None: open = set()
+        return cls(
+            ttl, loc,
+            open = open,
+            released_so_far = 0,
+            total_flow = sum(v.flow() for v in open),
+            non_progress = set()
+        )
+
+    def wait_here(self):
+        return dataclasses.replace(
+            self,
+            ttl = self.ttl - 1,
+            released_so_far = self.released_so_far + self.total_flow
+        )
+
+    def open_valve(self, v: Valve) -> 'State':
+        return dataclasses.replace(
+            self,
+            ttl = self.ttl - 1,
+            released_so_far = self.released_so_far + self.total_flow,
+            open = self.open | { v },
+            total_flow = self.total_flow + v.flow(),
+            non_progress = set(),
+        )
+        
+    def move_to(self, v: Valve) -> 'State':
+        return dataclasses.replace(
+            self,
+            ttl = self.ttl - 1,
+            loc = v,
+            released_so_far = self.released_so_far + self.total_flow,
+            open = self.open,
+            non_progress = self.non_progress | { self.loc }
+        )
+
     def __hash__(self):
         return hash((
             self.ttl,
@@ -161,6 +202,71 @@ class State:
             *self.non_progress,
         ))
 
+class StateMoveToTests(unittest.TestCase):
+    def test_that_open_or_total_flow_doesnt_change(self):
+        u, v, w = make_valves(zip("uvw", (10, 20, 30)))
+        s = State.new(30, u, {v, w})
+        t = s.move_to(v)
+        self.assertEqual(v, t.loc)
+        self.assertEqual(s.open, t.open)
+        self.assertEqual(s.total_flow, t.total_flow)
+    def test_that_prio_location_is_added_to_non_progress(self):
+        u, v, w = make_valves(zip("uvw", (10, 20, 30)))
+        s = State.new(30, u, {v, w})
+        t = s.move_to(v)
+        self.assertEqual(s.non_progress | { u }, t.non_progress )
+        
+
+class StateOpenValveTests(unittest.TestCase):
+    def test_total_flow_increments(self):
+        u, v, w = make_valves(zip("uvw", (10, 20, 30)))
+        s = State.new(30, u)
+        t = s.open_valve(u)
+        self.assertEqual(s.total_flow + 10, t.total_flow)
+    def test_ttl_decrements(self):
+        u, v, w = make_valves(zip("uvw", (10, 20, 30)))
+        s = State.new(30, u)
+        t = s.open_valve(u)
+        self.assertEqual(s.ttl - 1, t.ttl)
+
+class StateTests(unittest.TestCase):
+    def test_new_with_empty_open_set(self):
+        u, v, w = make_valves(zip("uvw", (10, 20, 30)))
+        s = State.new(30, u)
+        self.assertEqual(30, s.ttl)
+        self.assertEqual(u, s.loc)
+        self.assertEqual(set(), s.open)
+        self.assertEqual(0, s.total_flow)
+        self.assertEqual(0, s.released_so_far)
+        self.assertEqual(set(), s.non_progress)
+        
+    def test_new_initializes_total_flow_from_open(self):
+        u, v, w = make_valves(zip("uvw", (10, 20, 30)))
+        s = State.new(30, u, {v, w})
+        self.assertEqual({v, w}, s.open)
+        self.assertEqual(50, s.total_flow)
+        self.assertEqual(0, s.released_so_far)
+        
+    def test_wait_here_doesnt_change_loc_open_flow_rate(self):
+        u, v, w = make_valves(zip("uvw", (10, 20, 30)))
+        s = State.new(30, u, {v, w})
+        t = s.wait_here()
+        self.assertEqual(s.loc, t.loc)
+        self.assertEqual(s.open, t.open)
+        self.assertEqual(s.total_flow, t.total_flow)
+    
+    def test_wait_here_decrements_ttl(self):
+        u = make_valves(zip("u", (10,)))
+        s = State.new(30, u)
+        t = s.wait_here()
+        self.assertEqual(s.ttl - 1, t.ttl)
+
+    def test_wait_here_increments_total_relase(self):
+        u, v, w = make_valves(zip("uvw", (10, 20, 30)))
+        s = State.new(30, u, {v, w})
+        t = s.wait_here()
+        self.assertEqual(s.released_so_far + 50, t.released_so_far)
+    
 def next_states(state, max_possible_flow):
     make_state = partial(
         State, 
@@ -171,44 +277,29 @@ def next_states(state, max_possible_flow):
     
     if state.total_flow == max_possible_flow:
         # all valves are on, just sit here
-        yield make_state(
-            loc=state.loc,
-            open=state.open,
-            non_progress=state.non_progress
-        )
+        yield state.wait_here()
         return
     
     if state.loc not in state.open and state.loc.flow() > 0:
-        # the total flow rate only increases here, so reset the nonprogress set
-        yield make_state(
-            loc = state.loc, 
-            open = state.open | {state.loc},
-            non_progress = set(),
-            total_flow = state.total_flow + state.loc.flow()
-        )
+        yield state.open_valve(state.loc)
 
     for v in state.loc.neighbours():
         # only expand v if it doesn't form a no-progress cycle.
         # note that none of the states generated here increase the
         # flow rate
         if v in state.non_progress: continue
-        yield make_state(
-            loc = v,
-            open = state.open,
-            non_progress = state.non_progress | {state.loc}
-        )
+        yield state.move_to(v)
     
 class NextStateTests(unittest.TestCase):
     def test_doesnt_turn_on_valve_if_flow_is_zero(self):
         v = Valve('v', 0)
-        state = State(0, loc=v, open=set())
+        state = State.new(0, v, set())
         successors = set(next_states(state, float('+inf')))
         self.assertEqual(0, len(successors))
         
     def test_turns_on_valve_if_flow_isnt_zero(self):
         v = Valve('v', 10)
-        state = State(1, loc=v, open=set())
-        
+        state = State.new(1, v)
         successors = set(next_states(state, float('+inf')))
         self.assertEqual(1, len(successors))
         
@@ -226,7 +317,7 @@ class NextStateTests(unittest.TestCase):
         v.add_neighbour(w)
         v.add_neighbour(x)
         
-        s = State(ttl=1, loc=v, open={w, x}, total_flow=50)
+        s = State.new(1, v, {w, x})
         ns = exactly(1, next_states(s, 20 + 30))
         
         self.assertEqual(s.ttl - 1, ns.ttl)
@@ -238,7 +329,7 @@ class NextStateTests(unittest.TestCase):
         v.add_neighbour(w)
         v.add_neighbour(x)
         
-        s = State(1, loc=v, open=set())
+        s = State.new(1, v)
         successors = set(next_states(s, float('+inf')))
         
         self.assertEqual(2, len(successors))
@@ -257,10 +348,11 @@ class NextStateTests(unittest.TestCase):
         v.add_neighbour(w)
         w.add_neighbour(v)
         
-        s1 = State(10, loc=v, open=set())
+        s1 = State.new(10, v)
         s2 = exactly(1, next_states(s1, float('+inf')))
-        
-        self.assertEqual(0, len(set(next_states(s2, float('+inf')))))
+        successors = set(next_states(s2, float('+inf')))
+
+        self.assertEqual(0, len(successors))
  
 def exactly(n, items):
     items = iter(items)
@@ -304,14 +396,14 @@ def make_valves(descr: list[tuple[str, int]]) -> list[Valve]:
 class TestStateFlow(unittest.TestCase):
     def test_default_flow_so_far_is_zero(self):
         v = Valve('v', 10)
-        s = State( ttl=1, loc=v, open=set() )
+        s = State.new(1, v)
         self.assertEqual(0, s.released_so_far)
         
     def test_next_states_increase_total_release(self):
         v, w, x = make_valves(zip("vwx", (0, 10, 20)))
         v.add_neighbour(w)
         
-        s = State(ttl=1, loc=v, open={x}, total_flow=20)
+        s = State.new(1, v, {x})
         for ns in next_states(s, float('+inf')):
             self.assertEqual(20, ns.released_so_far)
 
@@ -390,7 +482,7 @@ def search(valves, start, ttl, verbose=False):
     
     elapsed_start = lap_start = time.perf_counter()
     
-    queue.insert( State(ttl, start, open=set()) )
+    queue.insert( State.new(ttl, start) )
     while queue:
         n = next(counter)
         
